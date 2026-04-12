@@ -60,14 +60,28 @@ namespace QuanLyNhaHang.ViewModel
                     return true;
                 }, (p) =>
                 {
-                    MyMessageBox msb = new MyMessageBox($"Việc xoá món ăn có thể dẫn đến mất mát dữ liệu của các phần khác. Bạn có muốn tiếp tục?", true);
+                    MyMessageBox msb = new MyMessageBox("Bạn có chắc chắn xóa cứng món ăn này và toàn bộ dữ liệu liên quan?", true);
                     msb.ShowDialog();
                     if (msb.ACCEPT() == true)
                     {
-                        MenuDP.Flag.RemoveDish(MenuItem.ID);
-                        MenuItems.Remove(MenuItem);
-                        MyMessageBox msb2 = new MyMessageBox("Xoá thành công!");
-                        msb2.Show();
+                        try
+                        {
+                            MenuDP.Flag.HardDeleteDishCascade(MenuItem.ID);
+                            MenuItems.Remove(MenuItem);
+                            MenuItem = new Models.MenuItem();
+                            MyMessageBox msb2 = new MyMessageBox("Xóa cứng thành công!");
+                            msb2.Show();
+                        }
+                        catch (InvalidOperationException ex)
+                        {
+                            MyMessageBox msb2 = new MyMessageBox(ex.Message);
+                            msb2.Show();
+                        }
+                        catch (SqlException)
+                        {
+                            MyMessageBox msb2 = new MyMessageBox("Lỗi cơ sở dữ liệu khi xóa cứng món ăn.");
+                            msb2.Show();
+                        }
                     }
                 });
                 AddDish_Command = new RelayCommand<Button>((p) =>

@@ -139,15 +139,41 @@ namespace QuanLyNhaHang.DataProvider
         }
         public void RemoveDish(string MaMon)
         {
+            HardDeleteDishCascade(MaMon);
+        }
+
+        public void HardDeleteDishCascade(string maMon)
+        {
+            if (string.IsNullOrWhiteSpace(maMon))
+            {
+                throw new InvalidOperationException("Mã món không hợp lệ.");
+            }
+
+            DBOpen();
+            SqlTransaction transaction = SqlCon.BeginTransaction();
             try
             {
-                DBOpen();
-                SqlCommand cmd = new SqlCommand();
-                cmd.CommandText = "Delete from MENU where MaMon = @mamon";
-                cmd.Parameters.AddWithValue("@mamon", MaMon);
+                EnsureDishExists(maMon, transaction);
 
-                cmd.Connection = SqlCon;
-                cmd.ExecuteNonQuery();
+                TableRef menuTable = GetMenuTable(transaction);
+                List<ForeignKeyRelation> relations = LoadForeignKeyRelations(transaction);
+                List<DeletePlan> deletePlans = BuildDeletePlans(menuTable, relations);
+
+                foreach (DeletePlan plan in deletePlans
+                    .OrderByDescending(p => p.MaxDepth)
+                    .ThenBy(p => p.TargetTable.Schema, StringComparer.OrdinalIgnoreCase)
+                    .ThenBy(p => p.TargetTable.Name, StringComparer.OrdinalIgnoreCase))
+                {
+                    ExecuteDeletePlan(plan, maMon, transaction);
+                }
+
+                DeleteDishRow(maMon, transaction);
+                transaction.Commit();
+            }
+            catch
+            {
+                transaction.Rollback();
+                throw;
             }
             finally
             {
@@ -340,6 +366,322 @@ namespace QuanLyNhaHang.DataProvider
             {
                 DBClose();
             }
+        }
+
+        private void EnsureDishExists(string maMon, SqlTransaction transaction)
+        {
+            using SqlCommand checkDish = new SqlCommand(
+                "SELECT COUNT(1) FROM MENU WITH (UPDLOCK, HOLDLOCK) WHERE MaMon = @maMon",
+                SqlCon,
+                transaction);
+            checkDish.Parameters.AddWithValue("@maMon", maMon);
+            if (Convert.ToInt32(checkDish.ExecuteScalar()) == 0)
+            {
+                throw new InvalidOperationException("Không tìm thấy món để xóa.");
+            }
+        }
+
+        private TableRef GetMenuTable(SqlTransaction transaction)
+        {
+            const string query =
+                "SELECT TOP (1) s.name AS SchemaName, t.name AS TableName " +
+                "FROM sys.tables t " +
+                "JOIN sys.schemas s ON t.schema_id = s.schema_id " +
+                "WHERE t.name = 'MENU'";
+
+            using SqlCommand cmd = new SqlCommand(query, SqlCon, transaction);
+            using SqlDataReader reader = cmd.ExecuteReader();
+            if (!reader.Read())
+            {
+                throw new InvalidOperationException("Không tìm thấy bảng MENU trong cơ sở dữ liệu.");
+            }
+
+            return new TableRef(reader.GetString(0), reader.GetString(1));
+        }
+
+        private List<ForeignKeyRelation> LoadForeignKeyRelations(SqlTransaction transaction)
+        {
+            const string query =
+                "SELECT fk.object_id, fk.name, " +
+                "       parentSchema.name AS ParentSchema, parentTable.name AS ParentTable, parentCol.name AS ParentColumn, " +
+                "       refSchema.name AS RefSchema, refTable.name AS RefTable, refCol.name AS RefColumn, " +
+                "       fkc.constraint_column_id " +
+                "FROM sys.foreign_keys fk " +
+                "JOIN sys.foreign_key_columns fkc ON fk.object_id = fkc.constraint_object_id " +
+                "JOIN sys.tables parentTable ON parentTable.object_id = fkc.parent_object_id " +
+                "JOIN sys.schemas parentSchema ON parentSchema.schema_id = parentTable.schema_id " +
+                "JOIN sys.columns parentCol ON parentCol.object_id = fkc.parent_object_id AND parentCol.column_id = fkc.parent_column_id " +
+                "JOIN sys.tables refTable ON refTable.object_id = fkc.referenced_object_id " +
+                "JOIN sys.schemas refSchema ON refSchema.schema_id = refTable.schema_id " +
+                "JOIN sys.columns refCol ON refCol.object_id = fkc.referenced_object_id AND refCol.column_id = fkc.referenced_column_id " +
+                "WHERE fk.is_disabled = 0 " +
+                "ORDER BY fk.object_id, fkc.constraint_column_id";
+
+            Dictionary<int, ForeignKeyRelation> map = new Dictionary<int, ForeignKeyRelation>();
+
+            using SqlCommand cmd = new SqlCommand(query, SqlCon, transaction);
+            using SqlDataReader reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                int fkId = reader.GetInt32(0);
+                if (!map.TryGetValue(fkId, out ForeignKeyRelation? relation))
+                {
+                    relation = new ForeignKeyRelation(
+                        reader.GetString(1),
+                        new TableRef(reader.GetString(5), reader.GetString(6)),
+                        new TableRef(reader.GetString(2), reader.GetString(3)));
+                    map[fkId] = relation;
+                }
+
+                relation.ColumnMappings.Add(new ColumnMapping(
+                    reader.GetString(4),
+                    reader.GetString(7)));
+            }
+
+            return map.Values.ToList();
+        }
+
+        private List<DeletePlan> BuildDeletePlans(TableRef rootTable, List<ForeignKeyRelation> relations)
+        {
+            Dictionary<TableRef, List<DeletePath>> planMap = new Dictionary<TableRef, List<DeletePath>>();
+            Queue<DeletePath> queue = new Queue<DeletePath>();
+            queue.Enqueue(new DeletePath(rootTable, new List<ForeignKeyRelation>()));
+
+            while (queue.Count > 0)
+            {
+                DeletePath current = queue.Dequeue();
+                TableRef currentTable = current.CurrentTable;
+
+                foreach (ForeignKeyRelation nextRelation in relations.Where(r => r.FromTable.Equals(currentTable)))
+                {
+                    if (current.ContainsTable(nextRelation.ToTable))
+                    {
+                        continue;
+                    }
+
+                    List<ForeignKeyRelation> newEdges = new List<ForeignKeyRelation>(current.Edges) { nextRelation };
+                    DeletePath nextPath = new DeletePath(rootTable, newEdges);
+                    if (!nextPath.CurrentTable.Equals(rootTable))
+                    {
+                        if (!planMap.TryGetValue(nextPath.CurrentTable, out List<DeletePath>? pathList))
+                        {
+                            pathList = new List<DeletePath>();
+                            planMap[nextPath.CurrentTable] = pathList;
+                        }
+                        pathList.Add(nextPath);
+                    }
+
+                    queue.Enqueue(nextPath);
+                }
+            }
+
+            return planMap.Select(kv => new DeletePlan(kv.Key, kv.Value)).ToList();
+        }
+
+        private void ExecuteDeletePlan(DeletePlan plan, string maMon, SqlTransaction transaction)
+        {
+            StringBuilder sql = new StringBuilder();
+            sql.Append("DELETE t FROM ");
+            sql.Append(plan.TargetTable.ToSqlIdentifier());
+            sql.Append(" t WHERE ");
+
+            for (int i = 0; i < plan.Paths.Count; i++)
+            {
+                if (i > 0)
+                {
+                    sql.Append(" OR ");
+                }
+                sql.Append(BuildExistsClause(plan.Paths[i], i));
+            }
+
+            using SqlCommand cmd = new SqlCommand(sql.ToString(), SqlCon, transaction);
+            cmd.Parameters.AddWithValue("@maMon", maMon);
+            cmd.ExecuteNonQuery();
+        }
+
+        private string BuildExistsClause(DeletePath path, int pathIndex)
+        {
+            int depth = path.Edges.Count;
+            if (depth <= 0)
+            {
+                return "1 = 0";
+            }
+
+            string aliasPrefix = "p" + pathIndex.ToString();
+            string nearestParentAlias = aliasPrefix + "_0";
+            StringBuilder clause = new StringBuilder();
+            clause.Append("EXISTS (SELECT 1 FROM ");
+            clause.Append(path.GetTableAt(depth - 1).ToSqlIdentifier());
+            clause.Append(" ").Append(nearestParentAlias);
+
+            for (int level = 1; level < depth; level++)
+            {
+                string descendantAlias = aliasPrefix + "_" + (level - 1).ToString();
+                string ancestorAlias = aliasPrefix + "_" + level.ToString();
+                TableRef ancestorTable = path.GetTableAt(depth - 1 - level);
+                ForeignKeyRelation relation = path.Edges[depth - 1 - level];
+
+                clause.Append(" INNER JOIN ");
+                clause.Append(ancestorTable.ToSqlIdentifier());
+                clause.Append(" ").Append(ancestorAlias);
+                clause.Append(" ON ");
+                clause.Append(BuildJoinCondition(descendantAlias, ancestorAlias, relation.ColumnMappings));
+            }
+
+            ForeignKeyRelation outerRelation = path.Edges[depth - 1];
+            string rootAlias = aliasPrefix + "_" + (depth - 1).ToString();
+
+            clause.Append(" WHERE ");
+            clause.Append(BuildJoinCondition("t", nearestParentAlias, outerRelation.ColumnMappings));
+            clause.Append(" AND ");
+            clause.Append(rootAlias).Append(".").Append(QuoteIdentifier("MaMon")).Append(" = @maMon");
+            clause.Append(")");
+            return clause.ToString();
+        }
+
+        private static string BuildJoinCondition(string descendantAlias, string ancestorAlias, List<ColumnMapping> mappings)
+        {
+            StringBuilder join = new StringBuilder();
+            for (int i = 0; i < mappings.Count; i++)
+            {
+                if (i > 0)
+                {
+                    join.Append(" AND ");
+                }
+
+                join.Append(descendantAlias)
+                    .Append(".")
+                    .Append(QuoteIdentifier(mappings[i].ParentColumn))
+                    .Append(" = ")
+                    .Append(ancestorAlias)
+                    .Append(".")
+                    .Append(QuoteIdentifier(mappings[i].ReferencedColumn));
+            }
+            return join.ToString();
+        }
+
+        private void DeleteDishRow(string maMon, SqlTransaction transaction)
+        {
+            using SqlCommand deleteDish = new SqlCommand("DELETE FROM MENU WHERE MaMon = @maMon", SqlCon, transaction);
+            deleteDish.Parameters.AddWithValue("@maMon", maMon);
+            int deletedCount = deleteDish.ExecuteNonQuery();
+            if (deletedCount == 0)
+            {
+                throw new InvalidOperationException("Không tìm thấy món để xóa.");
+            }
+        }
+
+        private static string QuoteIdentifier(string identifier)
+        {
+            return "[" + identifier.Replace("]", "]]") + "]";
+        }
+
+        private sealed class TableRef : IEquatable<TableRef>
+        {
+            public TableRef(string schema, string name)
+            {
+                Schema = schema;
+                Name = name;
+            }
+
+            public string Schema { get; }
+            public string Name { get; }
+
+            public string ToSqlIdentifier()
+            {
+                return QuoteIdentifier(Schema) + "." + QuoteIdentifier(Name);
+            }
+
+            public bool Equals(TableRef? other)
+            {
+                return other != null
+                    && string.Equals(Schema, other.Schema, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(Name, other.Name, StringComparison.OrdinalIgnoreCase);
+            }
+
+            public override bool Equals(object? obj)
+            {
+                return Equals(obj as TableRef);
+            }
+
+            public override int GetHashCode()
+            {
+                return StringComparer.OrdinalIgnoreCase.GetHashCode(Schema + "." + Name);
+            }
+        }
+
+        private sealed class ColumnMapping
+        {
+            public ColumnMapping(string parentColumn, string referencedColumn)
+            {
+                ParentColumn = parentColumn;
+                ReferencedColumn = referencedColumn;
+            }
+
+            public string ParentColumn { get; }
+            public string ReferencedColumn { get; }
+        }
+
+        private sealed class ForeignKeyRelation
+        {
+            public ForeignKeyRelation(string name, TableRef fromTable, TableRef toTable)
+            {
+                Name = name;
+                FromTable = fromTable;
+                ToTable = toTable;
+                ColumnMappings = new List<ColumnMapping>();
+            }
+
+            public string Name { get; }
+            public TableRef FromTable { get; }
+            public TableRef ToTable { get; }
+            public List<ColumnMapping> ColumnMappings { get; }
+        }
+
+        private sealed class DeletePath
+        {
+            public DeletePath(TableRef rootTable, List<ForeignKeyRelation> edges)
+            {
+                RootTable = rootTable;
+                Edges = edges;
+            }
+
+            public TableRef RootTable { get; }
+            public List<ForeignKeyRelation> Edges { get; }
+            public TableRef CurrentTable => Edges.Count == 0 ? RootTable : Edges[Edges.Count - 1].ToTable;
+
+            public bool ContainsTable(TableRef table)
+            {
+                if (RootTable.Equals(table))
+                {
+                    return true;
+                }
+
+                return Edges.Any(e => e.ToTable.Equals(table));
+            }
+
+            public TableRef GetTableAt(int index)
+            {
+                if (index == 0)
+                {
+                    return RootTable;
+                }
+
+                return Edges[index - 1].ToTable;
+            }
+        }
+
+        private sealed class DeletePlan
+        {
+            public DeletePlan(TableRef targetTable, List<DeletePath> paths)
+            {
+                TargetTable = targetTable;
+                Paths = paths;
+            }
+
+            public TableRef TargetTable { get; }
+            public List<DeletePath> Paths { get; }
+            public int MaxDepth => Paths.Count == 0 ? 0 : Paths.Max(p => p.Edges.Count);
         }
         #region complementary functions
         public Decimal Calculate_Sum(Int16 Soban)
