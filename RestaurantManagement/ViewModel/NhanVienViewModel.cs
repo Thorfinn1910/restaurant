@@ -1,399 +1,430 @@
-﻿using QuanLyNhaHang.Models;
+﻿using QuanLyNhaHang.DataProvider;
+using QuanLyNhaHang.Models;
 using RestaurantManagement.View;
 using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Data.SqlClient;
-using System.Data;
-using System.Configuration;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows.Input;
-using OfficeOpenXml.FormulaParsing.ExpressionGraph.FunctionCompilers;
+using System.Globalization;
 using System.Windows.Forms;
+using System.Windows.Input;
 
 namespace QuanLyNhaHang.ViewModel
 {
     public class NhanVienViewModel : BaseViewModel
     {
-        private ObservableCollection<NhanVien> _ListStaff;
-        public ObservableCollection<NhanVien> ListStaff { get => _ListStaff; set { _ListStaff = value; OnPropertyChanged(); } }
-
-        #region // List View Selected Item
-        private NhanVien _Selected;
-        public NhanVien Selected
+        public enum StaffFormMode
         {
-            get => _Selected;
+            Create,
+            Edit
+        }
+
+        private ObservableCollection<NhanVien> _listStaff;
+        public ObservableCollection<NhanVien> ListStaff
+        {
+            get => _listStaff;
             set
             {
-                _Selected = value;
-                OnPropertyChanged();
-                if (Selected != null)
-                {
-                    ID = Selected.MaNV;
-                    Name = Selected.HoTen;
-                    Position = Selected.ChucVu;
-                    if (Selected.Fulltime) Fulltime = "Full-time";
-                    else Fulltime = "Part-time";
-                    Address = Selected.DiaChi;
-                    Phone = Selected.SDT;
-                    DateBorn = Selected.NgaySinh;
-                    DateStartWork = Selected.NgayVaoLam;
-                    Account = Selected.TaiKhoan;
-                    Password = Selected.MatKhau;
-
-                    IDBeforeEdit = ID;
-                    AccBeforeEdit = Account;
-                    PosBeforeEdit = Position;
-                }
+                _listStaff = value;
                 OnPropertyChanged();
             }
         }
-        #endregion
 
-        #region // right card
-        private string _ID;
-        public string ID { get => _ID; set { _ID = value; OnPropertyChanged(); } }
-        private string _Name;
-        public string Name { get => _Name; set { _Name = value; OnPropertyChanged(); } }
-        private string _Position;
-        public string Position { get => _Position; set { _Position = value; OnPropertyChanged(); } }
-        private string _Fulltime;
-        public string Fulltime { get => _Fulltime; set { _Fulltime = value; OnPropertyChanged(); } }
-        private string _Address;
-        public string Address { get => _Address; set { _Address = value; OnPropertyChanged(); } }
-        private string _Phone;
-        public string Phone { get => _Phone; set { _Phone = value; OnPropertyChanged(); } }
-        private string _DateBorn;
-        public string DateBorn { get => _DateBorn; set { _DateBorn = value; OnPropertyChanged(); } }
-        private string _DateStartWork;
-        public string DateStartWork { get => _DateStartWork; set { _DateStartWork = value; OnPropertyChanged(); } }
-        private string _Account;
-        public string Account { get => _Account; set { _Account = value; OnPropertyChanged(); } }
-        private string _Password;
-        public string Password { get => _Password; set { _Password = value; OnPropertyChanged(); } }
-        #endregion
+        private NhanVien? _selected;
+        public NhanVien? Selected
+        {
+            get => _selected;
+            set
+            {
+                _selected = value;
+                OnPropertyChanged();
 
-        #region // Search bar
-        private string _Search;
+                if (_selected == null)
+                {
+                    EnterCreateMode();
+                    return;
+                }
+
+                ID = _selected.MaNV;
+                Name = _selected.HoTen;
+                Position = _selected.ChucVu;
+                Fulltime = _selected.Fulltime ? "Full-time" : "Part-time";
+                Address = _selected.DiaChi;
+                Phone = _selected.SDT;
+                DateBorn = _selected.NgaySinh;
+                DateStartWork = _selected.NgayVaoLam;
+                Account = _selected.TaiKhoan;
+                Password = _selected.MatKhau;
+
+                originalEmployeeId = ID;
+                originalAccountId = Account;
+                originalPosition = Position;
+
+                SetMode(StaffFormMode.Edit);
+            }
+        }
+
+        private StaffFormMode _currentStaffFormMode;
+        public StaffFormMode CurrentStaffFormMode
+        {
+            get => _currentStaffFormMode;
+            private set
+            {
+                _currentStaffFormMode = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(CurrentStaffFormModeKey));
+                OnPropertyChanged(nameof(CurrentStaffFormModeDescription));
+            }
+        }
+
+        public string CurrentStaffFormModeKey => CurrentStaffFormMode == StaffFormMode.Create ? "CREATE_STAFF_MODE" : "EDIT_STAFF_MODE";
+
+        public string CurrentStaffFormModeDescription =>
+            CurrentStaffFormMode == StaffFormMode.Create
+                ? "Đang thêm nhân viên mới. Bắt buộc có tài khoản đăng nhập."
+                : "Đang cập nhật hồ sơ nhân viên đã chọn.";
+
+        private string _id = string.Empty;
+        public string ID { get => _id; set { _id = value; OnPropertyChanged(); } }
+
+        private string _name = string.Empty;
+        public string Name { get => _name; set { _name = value; OnPropertyChanged(); } }
+
+        private string _position = string.Empty;
+        public string Position { get => _position; set { _position = value; OnPropertyChanged(); } }
+
+        private string _fulltime = string.Empty;
+        public string Fulltime { get => _fulltime; set { _fulltime = value; OnPropertyChanged(); } }
+
+        private string _address = string.Empty;
+        public string Address { get => _address; set { _address = value; OnPropertyChanged(); } }
+
+        private string _phone = string.Empty;
+        public string Phone { get => _phone; set { _phone = value; OnPropertyChanged(); } }
+
+        private string _dateBorn = string.Empty;
+        public string DateBorn { get => _dateBorn; set { _dateBorn = value; OnPropertyChanged(); } }
+
+        private string _dateStartWork = string.Empty;
+        public string DateStartWork { get => _dateStartWork; set { _dateStartWork = value; OnPropertyChanged(); } }
+
+        private string _account = string.Empty;
+        public string Account { get => _account; set { _account = value; OnPropertyChanged(); } }
+
+        private string _password = string.Empty;
+        public string Password { get => _password; set { _password = value; OnPropertyChanged(); } }
+
+        private string _search = string.Empty;
         public string Search
         {
-            get => _Search;
+            get => _search;
             set
             {
-                _Search = value;
-                string strQuery;
+                _search = value;
                 OnPropertyChanged();
-                if (!String.IsNullOrEmpty(Search))
-                {
-                    strQuery = "SELECT n.*, t.ID, t.MatKhau FROM NHANVIEN AS n LEFT JOIN TAIKHOAN AS t ON n.MaNV = t.MaNV WHERE TenNV LIKE N'%" + Search + "%'";
-                }
-                else
-                    strQuery = "SELECT n.*, t.ID, t.MatKhau FROM NHANVIEN AS n LEFT JOIN TAIKHOAN AS t ON n.MaNV = t.MaNV";
-                ListViewDisplay(strQuery);
+                LoadEmployees();
             }
         }
-        #endregion
 
-        string IDBeforeEdit;
-        string AccBeforeEdit;
-        string PosBeforeEdit;
+        private string originalEmployeeId = string.Empty;
+        private string originalAccountId = string.Empty;
+        private string originalPosition = string.Empty;
+
         public ICommand AddCM { get; set; }
         public ICommand EditCM { get; set; }
         public ICommand DeleteCM { get; set; }
         public ICommand CheckCM { get; set; }
-
-        private string strCon = ConfigurationManager.ConnectionStrings["QuanLyNhaHang"].ConnectionString;
-        private SqlConnection sqlCon = null;
+        public ICommand NewStaffCM { get; set; }
 
         public NhanVienViewModel()
         {
-            OpenConnect();
-
-            DateBorn = DateTime.Now.ToShortDateString();
-            DateStartWork = DateTime.Now.ToShortDateString();
-
             ListStaff = new ObservableCollection<NhanVien>();
-            ListViewDisplay("SELECT n.*, t.ID, t.MatKhau FROM NHANVIEN AS n LEFT JOIN TAIKHOAN AS t ON n.MaNV = t.MaNV");
 
+            EnterCreateMode();
+            LoadEmployees();
 
-            #region //add command
-            AddCM = new RelayCommand<object>((p) =>
-            {
-                foreach (NhanVien item in ListStaff)
-                {
-                    if (item.MaNV == ID) return false;
-                }
-                if (string.IsNullOrEmpty(ID) || string.IsNullOrEmpty(Name) || string.IsNullOrEmpty(Position) || string.IsNullOrEmpty(Fulltime) || string.IsNullOrEmpty(DateStartWork))
-                    return false;
-                if (!isNumber(Phone)) return false;
-                foreach(NhanVien nv in ListStaff)
-                {
-                    if (nv.TaiKhoan == Account && !string.IsNullOrEmpty(Account)) return false;
-                }    
-                if ((!String.IsNullOrEmpty(Account) && String.IsNullOrEmpty(Password)) || (String.IsNullOrEmpty(Account) && !String.IsNullOrEmpty(Password))) return false;
-
-                return true;
-            }, (p) =>
-            {
-                OpenConnect();
-
-                int ft;
-                if (Fulltime == "Full-time") ft = 1;
-                else ft = 0;
-
-                SqlCommand cmd = new SqlCommand();
-                cmd.CommandType = CommandType.Text;
-                cmd.CommandText = "INSERT INTO NHANVIEN VALUES ('" + ID + "',N'" + Name + "',N'" + Position + "'," + ft + ",N'" + Address + "','" + Phone + "','" + DateBorn + "','" + DateStartWork + "')";
-                cmd.Connection = sqlCon;
-
-                int result = cmd.ExecuteNonQuery();
-
-                if (!String.IsNullOrEmpty(Account))
-                {
-                    cmd.CommandText = "INSERT INTO TAIKHOAN(ID, MatKhau, Quyen, MaNV) VALUES('" + Account + "', '" + Password + "', 'nhan vien', '" + ID + "')";
-                    cmd.ExecuteNonQuery();
-                }    
-                if (result > 0)
-                {
-                    MyMessageBox mess = new MyMessageBox("Thêm thành công!");
-                    mess.ShowDialog();
-                }
-                else
-                {
-                    MyMessageBox mess = new MyMessageBox("Thêm không thành công!");
-                    mess.ShowDialog();
-                }
-                ListViewDisplay("SELECT n.*, t.ID, t.MatKhau FROM NHANVIEN AS n LEFT JOIN TAIKHOAN AS t ON n.MaNV = t.MaNV");
-
-                CloseConnect();
-            });
-            #endregion
-
-
-            #region //edit command
-            EditCM = new RelayCommand<object>((p) =>
-            {
-                foreach (NhanVien item in ListStaff)
-                {
-                    if (ID == item.MaNV && Name == item.HoTen && Position == item.ChucVu && Address == item.DiaChi && Phone == item.SDT && Account == item.TaiKhoan && Password == item.MatKhau && DateBorn == item.NgaySinh && DateStartWork == item.NgayVaoLam)
-                    {
-                        if ((Fulltime == "Full-time" && item.Fulltime) || (Fulltime == "Part-time" && !item.Fulltime))
-                            return false;
-                    }
-                }
-                if (String.IsNullOrEmpty(ID) || String.IsNullOrEmpty(Name) || String.IsNullOrEmpty(Position) || String.IsNullOrEmpty(Fulltime) || String.IsNullOrEmpty(DateStartWork))
-                    return false;
-                if (!isNumber(Phone)) return false;
-                if ((!String.IsNullOrEmpty(Account) && String.IsNullOrEmpty(Password)) || (String.IsNullOrEmpty(Account) && !String.IsNullOrEmpty(Password))) return false;
-                
-                if (PosBeforeEdit == "Quản lý" && PosBeforeEdit != Position) return false;
-                if (PosBeforeEdit != Position && Position == "Quản lý") return false;
-
-                foreach(NhanVien item in ListStaff)
-                {
-                    if (ID == item.MaNV) return true;
-                }
-                return false;   
-            }, (p) =>
-            {
-                OpenConnect();
-
-                if (ID != IDBeforeEdit)
-                {
-                    MyMessageBox mess = new MyMessageBox("Không được sửa ID!");
-                    ID = IDBeforeEdit;
-                    mess.ShowDialog();
-                }
-                else
-                if (Account != AccBeforeEdit)
-                {
-                    if (string.IsNullOrEmpty(AccBeforeEdit))
-                    {
-                        SqlCommand cmd = new SqlCommand();
-                        cmd.CommandType = CommandType.Text;
-                        cmd.Connection = sqlCon;
-                        cmd.CommandText = "INSERT INTO TAIKHOAN VALUES('" + Account + "', '" + Password + "', 'Staff', '" + ID + "')";
-
-                        int result = cmd.ExecuteNonQuery();
-
-                        if (result > 0)
-                        {
-                            MyMessageBox mess = new MyMessageBox("Sửa thành công!");
-                            mess.ShowDialog();
-                            Refresh();
-                        }
-                        else
-                        {
-                            MyMessageBox mess = new MyMessageBox("Sửa không thành công!");
-                            mess.ShowDialog();
-                        }
-                        ListViewDisplay("SELECT n.*, t.ID, t.MatKhau FROM NHANVIEN AS n LEFT JOIN TAIKHOAN AS t ON n.MaNV = t.MaNV");
-                    }    
-                    else
-                    {
-                        MyMessageBox mess = new MyMessageBox("Không được sửa Tài khoản!");
-                        Account = AccBeforeEdit;
-                        mess.ShowDialog();
-                    }    
-                }    
-                else
-                {
-                    int ft;
-                    if (Fulltime == "Full-time") ft = 1;
-                    else ft = 0;
-
-                    SqlCommand cmd = new SqlCommand();
-                    cmd.CommandType = CommandType.Text;
-                    cmd.CommandText = "UPDATE NHANVIEN SET TenNV = N'" + Name + "', ChucVu = N'" + Position + "', DiaChi = N'" + Address + "', Fulltime = " + ft + ", SDT = '" + Phone + "', NgayVaoLam = '" + DateStartWork + "', NgaySinh = '" + DateBorn + "' WHERE MaNV = '" + ID + "'";
-                    cmd.Connection = sqlCon;
-
-                    int result = cmd.ExecuteNonQuery();
-
-                    if (result > 0)
-                    {
-                        MyMessageBox mess = new MyMessageBox("Sửa thành công!");
-                        mess.ShowDialog();
-                        Refresh();
-                    }
-                    else
-                    {
-                        MyMessageBox mess = new MyMessageBox("Sửa không thành công!");
-                        mess.ShowDialog();
-                    }
-                    ListViewDisplay("SELECT n.*, t.ID, t.MatKhau FROM NHANVIEN AS n LEFT JOIN TAIKHOAN AS t ON n.MaNV = t.MaNV");
-                }
-
-                CloseConnect();
-            });
-            #endregion
-
-
-            #region //delete command
-            DeleteCM = new RelayCommand<object>((p) =>
-            {
-                if (Selected == null) return false;
-                if (Selected.ChucVu == "Quản lý") return false;
-                return true;
-            }, (p) =>
-            {
-                OpenConnect();
-
-                MyMessageBox yesno = new MyMessageBox("Bạn có chắc chắn xóa?", true);
-                yesno.ShowDialog();
-
-                if (yesno.ACCEPT())
-                {
-                    SqlCommand cmd = new SqlCommand();
-                    cmd.Connection = sqlCon;
-                    cmd.CommandType = CommandType.Text;
-                    if (!string.IsNullOrEmpty(Account))
-                    {
-                        cmd.CommandText = "DELETE FROM TAIKHOAN WHERE ID = '" + Account + "'";
-                        cmd.ExecuteNonQuery();
-                    }
-
-                    cmd.CommandText = "DELETE FROM NHANVIEN WHERE MaNV = '" + ID +"'";
-                    int result = cmd.ExecuteNonQuery();
-                    if (result > 0)
-                    {
-                        MyMessageBox mess = new MyMessageBox("Xóa thành công!");
-                        mess.ShowDialog();
-                        Refresh();
-                    }
-                    else
-                    {
-                        MyMessageBox mess = new MyMessageBox("Xóa không thành công!");
-                        mess.ShowDialog();
-                    }
-                }
-                ListViewDisplay("SELECT n.*, t.ID, t.MatKhau FROM NHANVIEN AS n LEFT JOIN TAIKHOAN AS t ON n.MaNV = t.MaNV");
-
-                CloseConnect();
-            });
-            #endregion
-
-
-            CheckCM = new RelayCommand<object>((p) => { return true; }, (p) =>
+            AddCM = new RelayCommand<object>((p) => CanAddEmployee(), (p) => AddEmployee());
+            EditCM = new RelayCommand<object>((p) => CanEditEmployee(), (p) => EditEmployee());
+            DeleteCM = new RelayCommand<object>((p) => Selected != null && Selected.ChucVu != "Quản lý", (p) => DeleteEmployee());
+            CheckCM = new RelayCommand<object>((p) => true, (p) =>
             {
                 RestaurantManagement.View.ChamCong chamCong = new RestaurantManagement.View.ChamCong();
                 chamCong.Show();
-                return;
             });
-
-            CloseConnect();
+            NewStaffCM = new RelayCommand<object>((p) => true, (p) => EnterCreateMode());
         }
 
-        private void ListViewDisplay(string strQuery)
+        private void SetMode(StaffFormMode mode)
         {
-            OpenConnect();
+            CurrentStaffFormMode = mode;
+        }
 
-            SqlCommand cmd = new SqlCommand();
-            cmd.CommandType = CommandType.Text;
-            cmd.CommandText = strQuery;
-            cmd.Connection = sqlCon;
-            SqlDataReader reader = cmd.ExecuteReader();
+        private void EnterCreateMode()
+        {
+            SetMode(StaffFormMode.Create);
+            originalEmployeeId = string.Empty;
+            originalAccountId = string.Empty;
+            originalPosition = string.Empty;
+            RefreshForm();
+            DateBorn = DateTime.Now.ToShortDateString();
+            DateStartWork = DateTime.Now.ToShortDateString();
+            _selected = null;
+            OnPropertyChanged(nameof(Selected));
+        }
 
-            ListStaff.Clear();
-            while (reader.Read())
+        private bool CanAddEmployee()
+        {
+            return CurrentStaffFormMode == StaffFormMode.Create;
+        }
+
+        private bool CanEditEmployee()
+        {
+            return CurrentStaffFormMode == StaffFormMode.Edit && Selected != null;
+        }
+
+        private void AddEmployee()
+        {
+            if (!TryBuildEmployeeInput(out EmployeeUpsertInput input, out string message))
             {
-                string id = reader.GetString(0);
-                string ten = reader.GetString(1);
-                string chucvu = reader.GetString(2);
-                bool ftime = reader.GetBoolean(3);   
-                string diachi = reader.GetString(4);
-                string sdt = reader.GetString(5);
-                string ngsinh = reader.GetDateTime(6).ToShortDateString();
-                string ngvl = reader.GetDateTime(7).ToShortDateString();
-                string tk = "";
-                if (!reader.IsDBNull(8))
-                    tk = reader.GetString(8);
-                string mk = "";
-                if (!reader.IsDBNull(9))
-                    mk = reader.GetString(9);
-                
-                ListStaff.Add(new NhanVien(id, ten, chucvu, diachi, ftime, sdt, ngvl, ngsinh, tk, mk));
+                ShowMessage(message);
+                return;
             }
 
-            CloseConnect();
-        }
-        private void OpenConnect()
-        {
-            sqlCon = new SqlConnection(strCon);
-            if (sqlCon.State == ConnectionState.Closed)
+            if (string.Equals(input.Position, "Quản lý", StringComparison.OrdinalIgnoreCase))
             {
-                sqlCon.Open();
+                ShowMessage("Không được thêm nhân viên có chức vụ Quản lý từ màn này.");
+                return;
+            }
+
+            try
+            {
+                NhanVienDP.Flag.CreateEmployeeWithAccount(input);
+                ShowMessage("Thêm nhân viên thành công!");
+                LoadEmployees();
+                EnterCreateMode();
+            }
+            catch (InvalidOperationException ex)
+            {
+                ShowMessage(ex.Message);
+            }
+            catch (SqlException)
+            {
+                ShowMessage("Lỗi cơ sở dữ liệu khi thêm nhân viên.");
             }
         }
-        private void CloseConnect()
+
+        private void EditEmployee()
         {
-            if (sqlCon.State == ConnectionState.Open)
+            if (Selected == null)
             {
-                sqlCon.Close();
+                ShowMessage("Vui lòng chọn nhân viên cần cập nhật.");
+                return;
+            }
+
+            if (!TryBuildEmployeeInput(out EmployeeUpsertInput input, out string message))
+            {
+                ShowMessage(message);
+                return;
+            }
+
+            if (!string.Equals(input.EmployeeId, originalEmployeeId, StringComparison.OrdinalIgnoreCase))
+            {
+                ShowMessage("Không được sửa mã nhân viên.");
+                ID = originalEmployeeId;
+                return;
+            }
+
+            if (string.Equals(originalPosition, "Quản lý", StringComparison.OrdinalIgnoreCase) && !string.Equals(input.Position, "Quản lý", StringComparison.OrdinalIgnoreCase))
+            {
+                ShowMessage("Không được hạ chức vụ nhân viên Quản lý từ màn này.");
+                Position = originalPosition;
+                return;
+            }
+
+            if (!string.Equals(originalPosition, "Quản lý", StringComparison.OrdinalIgnoreCase) && string.Equals(input.Position, "Quản lý", StringComparison.OrdinalIgnoreCase))
+            {
+                ShowMessage("Không được nâng chức vụ lên Quản lý từ màn này.");
+                Position = originalPosition;
+                return;
+            }
+
+            try
+            {
+                NhanVienDP.Flag.UpdateEmployeeWithAccount(input, originalEmployeeId, originalAccountId);
+                ShowMessage("Cập nhật thành công!");
+                LoadEmployees();
+                EnterCreateMode();
+            }
+            catch (InvalidOperationException ex)
+            {
+                ShowMessage(ex.Message);
+            }
+            catch (SqlException)
+            {
+                ShowMessage("Lỗi cơ sở dữ liệu khi cập nhật nhân viên.");
             }
         }
-        private void Refresh()
+
+        private void DeleteEmployee()
         {
-            ID = "";
-            Name = "";
-            Position = "";
-            Fulltime = "";
-            Address = "";
-            Phone = "";
-            DateBorn = "";
-            DateStartWork = "";
-            Account = "";
-            Password = "";
+            if (Selected == null)
+            {
+                return;
+            }
+
+            MyMessageBox confirm = new MyMessageBox("Bạn có chắc chắn xóa cứng nhân viên này và toàn bộ dữ liệu liên quan?", true);
+            confirm.ShowDialog();
+            if (!confirm.ACCEPT())
+            {
+                return;
+            }
+
+            try
+            {
+                NhanVienDP.Flag.HardDeleteEmployeeCascade(Selected.MaNV);
+                ShowMessage("Xóa thành công!");
+                LoadEmployees();
+                EnterCreateMode();
+            }
+            catch (InvalidOperationException ex)
+            {
+                ShowMessage(ex.Message);
+            }
+            catch (SqlException)
+            {
+                ShowMessage("Lỗi cơ sở dữ liệu khi xóa cứng nhân viên.");
+            }
         }
+
+        private void LoadEmployees()
+        {
+            ListStaff = NhanVienDP.Flag.GetEmployees((Search ?? string.Empty).Trim());
+        }
+
+        private bool TryBuildEmployeeInput(out EmployeeUpsertInput input, out string errorMessage)
+        {
+            input = new EmployeeUpsertInput();
+            errorMessage = string.Empty;
+
+            string employeeId = (ID ?? string.Empty).Trim();
+            string fullName = (Name ?? string.Empty).Trim();
+            string position = (Position ?? string.Empty).Trim();
+            string fulltimeText = (Fulltime ?? string.Empty).Trim();
+            string address = (Address ?? string.Empty).Trim();
+            string phone = (Phone ?? string.Empty).Trim();
+            string dateBornText = (DateBorn ?? string.Empty).Trim();
+            string dateStartWorkText = (DateStartWork ?? string.Empty).Trim();
+            string account = (Account ?? string.Empty).Trim();
+            string password = (Password ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(employeeId)
+                || string.IsNullOrWhiteSpace(fullName)
+                || string.IsNullOrWhiteSpace(position)
+                || string.IsNullOrWhiteSpace(fulltimeText)
+                || string.IsNullOrWhiteSpace(phone)
+                || string.IsNullOrWhiteSpace(dateBornText)
+                || string.IsNullOrWhiteSpace(dateStartWorkText)
+                || string.IsNullOrWhiteSpace(account)
+                || string.IsNullOrWhiteSpace(password))
+            {
+                errorMessage = "Vui lòng nhập đầy đủ thông tin bắt buộc.";
+                return false;
+            }
+
+            if (!string.Equals(fulltimeText, "Full-time", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(fulltimeText, "Part-time", StringComparison.OrdinalIgnoreCase))
+            {
+                errorMessage = "Hình thức làm việc không hợp lệ.";
+                return false;
+            }
+
+            if (!isNumber(phone) || phone.Length < 9 || phone.Length > 11)
+            {
+                errorMessage = "Số điện thoại chỉ được chứa chữ số và có độ dài 9-11 ký tự.";
+                return false;
+            }
+
+            if (!DateTime.TryParse(dateBornText, CultureInfo.CurrentCulture, DateTimeStyles.None, out DateTime dateBorn)
+                && !DateTime.TryParse(dateBornText, CultureInfo.InvariantCulture, DateTimeStyles.None, out dateBorn))
+            {
+                errorMessage = "Ngày sinh không hợp lệ.";
+                return false;
+            }
+
+            if (!DateTime.TryParse(dateStartWorkText, CultureInfo.CurrentCulture, DateTimeStyles.None, out DateTime dateStartWork)
+                && !DateTime.TryParse(dateStartWorkText, CultureInfo.InvariantCulture, DateTimeStyles.None, out dateStartWork))
+            {
+                errorMessage = "Ngày vào làm không hợp lệ.";
+                return false;
+            }
+
+            if (dateStartWork.Date < dateBorn.Date)
+            {
+                errorMessage = "Ngày vào làm không được nhỏ hơn ngày sinh.";
+                return false;
+            }
+
+            if (account.Contains(" "))
+            {
+                errorMessage = "Tài khoản đăng nhập không được chứa khoảng trắng.";
+                return false;
+            }
+
+            if (password.Length < 6)
+            {
+                errorMessage = "Mật khẩu phải có ít nhất 6 ký tự.";
+                return false;
+            }
+
+            input.EmployeeId = employeeId;
+            input.FullName = fullName;
+            input.Position = position;
+            input.IsFulltime = string.Equals(fulltimeText, "Full-time", StringComparison.OrdinalIgnoreCase);
+            input.Address = address;
+            input.Phone = phone;
+            input.DateOfBirth = dateBorn;
+            input.DateStartWork = dateStartWork;
+            input.AccountId = account;
+            input.Password = password;
+
+            return true;
+        }
+
+        private void RefreshForm()
+        {
+            ID = string.Empty;
+            Name = string.Empty;
+            Position = string.Empty;
+            Fulltime = "Full-time";
+            Address = string.Empty;
+            Phone = string.Empty;
+            DateBorn = string.Empty;
+            DateStartWork = string.Empty;
+            Account = string.Empty;
+            Password = string.Empty;
+        }
+
         private bool isNumber(string s)
         {
-            if (s == null) return false;
+            if (string.IsNullOrWhiteSpace(s))
+            {
+                return false;
+            }
+
             for (int i = 0; i < s.Length; i++)
             {
-                if (s[i] < 48 || s[i] > 57) return false;
+                if (s[i] < '0' || s[i] > '9')
+                {
+                    return false;
+                }
             }
+
             return true;
+        }
+
+        private void ShowMessage(string message)
+        {
+            MyMessageBox mess = new MyMessageBox(message);
+            mess.ShowDialog();
         }
     }
 }

@@ -33,6 +33,7 @@
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
                     <Border Grid.Column="0" Background="#F1F5F9" CornerRadius="8" BorderThickness="1" BorderBrush="#E2E8F0" Padding="15 0" Height="45" Margin="0 0 20 0">
@@ -59,10 +60,19 @@
 
                     <Button Name="btnDeleteStaff" Grid.Column="2" Command="{Binding DeleteCM}" Click="btnDeleteStaff_Click"
                             Background="#EF4444" Foreground="White" BorderThickness="0" Cursor="Hand" Height="45" Width="90" 
-                            materialDesign:ButtonAssist.CornerRadius="6" VerticalAlignment="Bottom">
+                            materialDesign:ButtonAssist.CornerRadius="6" VerticalAlignment="Bottom" Margin="0 0 10 0">
                         <StackPanel Orientation="Horizontal">
                             <fa:IconImage Icon="TrashCan" Width="16" Height="16" Foreground="White" Margin="0 0 8 0"/>
                             <TextBlock Text="Xóa" VerticalAlignment="Center" FontWeight="Bold"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button Name="btnNewStaffMode" Grid.Column="3" Command="{Binding NewStaffCM}"
+                            Background="#0EA5E9" Foreground="White" BorderThickness="0" Cursor="Hand" Height="45" Width="110"
+                            materialDesign:ButtonAssist.CornerRadius="6" VerticalAlignment="Bottom">
+                        <StackPanel Orientation="Horizontal">
+                            <fa:IconImage Icon="Plus" Width="16" Height="16" Foreground="White" Margin="0 0 8 0"/>
+                            <TextBlock Text="Tạo mới" VerticalAlignment="Center" FontWeight="Bold"/>
                         </StackPanel>
                     </Button>
                 </Grid>
@@ -117,9 +127,13 @@
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <StackPanel Grid.Row="0" Margin="0 0 0 20" Orientation="Horizontal">
-                    <fa:IconImage Icon="UserEdit" Width="22" Height="22" Foreground="#1C3879" Margin="0 0 10 0" VerticalAlignment="Center"/>
-                    <TextBlock Text="HỒ SƠ NHÂN VIÊN" FontSize="18" FontWeight="Bold" Foreground="#1E293B" VerticalAlignment="Center"/>
+                <StackPanel Grid.Row="0" Margin="0 0 0 20">
+                    <StackPanel Orientation="Horizontal">
+                        <fa:IconImage Icon="UserEdit" Width="22" Height="22" Foreground="#1C3879" Margin="0 0 10 0" VerticalAlignment="Center"/>
+                        <TextBlock Text="HỒ SƠ NHÂN VIÊN" FontSize="18" FontWeight="Bold" Foreground="#1E293B" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <TextBlock Text="{Binding CurrentStaffFormModeKey}" FontSize="12" FontWeight="Bold" Foreground="#1C3879" Margin="0 8 0 0"/>
+                    <TextBlock Text="{Binding CurrentStaffFormModeDescription}" FontSize="12" Foreground="#64748B" Margin="0 2 0 0"/>
                 </StackPanel>
 
                 <Separator Grid.Row="0" VerticalAlignment="Bottom" Background="#E2E8F0" Margin="0"/>
@@ -178,14 +192,31 @@
                     </Grid>
                 </ScrollViewer>
 
-                <Button Name="btnEditStaff" Grid.Row="2" Command="{Binding EditCM}" 
-                        Background="#10B981" Foreground="White" BorderThickness="0" Cursor="Hand" Height="50" Margin="0 10 0 0"
-                        materialDesign:ButtonAssist.CornerRadius="8">
-                    <StackPanel Orientation="Horizontal">
-                        <fa:IconImage Icon="Save" Width="18" Height="18" Foreground="White" Margin="0 0 10 0"/>
-                        <TextBlock Text="CẬP NHẬT THÔNG TIN" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
-                    </StackPanel>
-                </Button>
+                <Grid Grid.Row="2" Margin="0 10 0 0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Button Grid.Column="0" Name="btnAddStaff" Command="{Binding AddCM}"
+                            Background="#1C3879" Foreground="White" BorderThickness="0" Cursor="Hand" Height="50"
+                            materialDesign:ButtonAssist.CornerRadius="8">
+                        <StackPanel Orientation="Horizontal">
+                            <fa:IconImage Icon="UserPlus" Width="18" Height="18" Foreground="White" Margin="0 0 10 0"/>
+                            <TextBlock Text="THÊM NHÂN VIÊN" FontSize="15" FontWeight="Bold" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button Grid.Column="2" Name="btnEditStaff" Command="{Binding EditCM}" 
+                            Background="#10B981" Foreground="White" BorderThickness="0" Cursor="Hand" Height="50"
+                            materialDesign:ButtonAssist.CornerRadius="8">
+                        <StackPanel Orientation="Horizontal">
+                            <fa:IconImage Icon="Save" Width="18" Height="18" Foreground="White" Margin="0 0 10 0"/>
+                            <TextBlock Text="CẬP NHẬT THÔNG TIN" FontSize="15" FontWeight="Bold" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                </Grid>
 
             </Grid>
         </Border>
