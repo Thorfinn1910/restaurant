@@ -157,18 +157,22 @@ namespace QuanLyNhaHang.Models
     }
     public class SelectedMenuItem : BaseViewModel
     {
-        public SelectedMenuItem(string ID, string foodName, Decimal price, int quantity)
+        public SelectedMenuItem(string ID, string foodName, Decimal price, int quantity, bool isLockedByChef = false)
         {
             _id = ID;
             _foodName = foodName;
             _price = price;
             _quantity = quantity;
+            _isLockedByChef = isLockedByChef;
+            _originalQuantity = quantity;
         }
         #region attributes
         private string _id;
         private string _foodName;
         private Decimal _price;
         private int _quantity;
+        private int _originalQuantity;
+        private bool _isLockedByChef;
         #endregion
         #region properties
         public string ID { get { return _id; } set { _id = value; } }
@@ -212,6 +216,32 @@ namespace QuanLyNhaHang.Models
                 {
                     _quantity = value;
                     OnPropertyChanged("quantity");
+                }
+            }
+        }
+
+        public int OriginalQuantity
+        {
+            get { return _originalQuantity; }
+            set
+            {
+                if (_originalQuantity != value)
+                {
+                    _originalQuantity = value;
+                    OnPropertyChanged("original quantity");
+                }
+            }
+        }
+
+        public bool IsLockedByChef
+        {
+            get { return _isLockedByChef; }
+            set
+            {
+                if (_isLockedByChef != value)
+                {
+                    _isLockedByChef = value;
+                    OnPropertyChanged("is locked by chef");
                 }
             }
         }

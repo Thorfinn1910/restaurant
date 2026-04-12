@@ -40,10 +40,10 @@ namespace QuanLyNhaHang.ViewModel
             _menuItemsView.SortDescriptions.Add(new SortDescription("FoodName", ListSortDirection.Ascending));
             //Command actions
             OrderFeature_Command = new RelayCommand<MenuItem>((p) => true, (p) => OrderAnItem(p.ID));
-            RemoveItemFeature_Command = new RelayCommand<SelectedMenuItem>((p) => true, (p) => RemoveAnItem(p));
+            RemoveItemFeature_Command = new RelayCommand<SelectedMenuItem>((p) => p != null && !p.IsLockedByChef, (p) => RemoveAnItem(p));
             ClearAllSelectedDishes = new RelayCommand<object>((p) =>
             {
-                if (SelectedItems.Count == 0) return false;
+                if (IsEditOrderMode || SelectedItems.Count == 0) return false;
                 return true;
             }, (p) => {
                 MyMessageBox msb = new MyMessageBox("Bạn có muốn xoá tất cả những món đã chọn?", true);
@@ -65,6 +65,12 @@ namespace QuanLyNhaHang.ViewModel
                 return true;
             }, (p) =>
             {
+                if (IsEditOrderMode)
+                {
+                    SaveCurrentOrderChanges();
+                    return;
+                }
+
                 string mess = "";
                 string tennl = String.Empty;
                 try
@@ -136,9 +142,12 @@ namespace QuanLyNhaHang.ViewModel
                     ms.Show();
                 }
             });
+            LoadOpenOrderForSelectedTable_Command = new RelayCommand<object>((p) => SelectedTable != null, (p) => LoadOpenOrderForSelectedTable());
+            CancelOrderEditing_Command = new RelayCommand<object>((p) => IsEditOrderMode, (p) => CancelOrderEditing());
             _selectedItems = new ObservableCollection<SelectedMenuItem>();
             _comboBox_2Items = new ObservableCollection<string>();
             LoadCombobox_2Items();
+            IsEditOrderMode = false;
         }
           
         #region attributes
@@ -157,6 +166,9 @@ namespace QuanLyNhaHang.ViewModel
         private string str_subtotal = "0 VND";
         private string _searchText;
         private string MaNV;
+        private int _currentOpenOrderId = 0;
+        private bool _isEditOrderMode = false;
+        private bool _isLoadingOrder = false;
         #endregion
 
         #region properties
@@ -167,7 +179,19 @@ namespace QuanLyNhaHang.ViewModel
         public ObservableCollection<Models.Kho> Kho { get { return _kho; } set { _kho = value; OnPropertyChanged(); } }
         public ObservableCollection<string> ComboBox_2Items { get { return _comboBox_2Items; } set { _comboBox_2Items = value; } }
         public string MyComboboxSelection { get { return myComboboxSelection; } set { myComboboxSelection = value; OnPropertyChanged(); }}
-        public Table SelectedTable { get { return _selectedTable; } set { _selectedTable = value; OnPropertyChanged(); } }
+        public Table SelectedTable
+        {
+            get { return _selectedTable; }
+            set
+            {
+                _selectedTable = value;
+                OnPropertyChanged();
+                if (!_isLoadingOrder)
+                {
+                    LoadOpenOrderForSelectedTable();
+                }
+            }
+        }
         public ICollectionView MenuItemCollection
         {
             get
@@ -203,6 +227,28 @@ namespace QuanLyNhaHang.ViewModel
         }
 
         public string SearchText { get { return _searchText; } set { _searchText = value; this._menuItemsView.View.Refresh(); OnPropertyChanged(); } }
+
+        public bool IsEditOrderMode
+        {
+            get => _isEditOrderMode;
+            set
+            {
+                _isEditOrderMode = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(IsNewOrderMode));
+                OnPropertyChanged(nameof(CurrentOrderModeKey));
+                OnPropertyChanged(nameof(CurrentOrderModeDescription));
+                OnPropertyChanged(nameof(PrimaryOrderActionText));
+            }
+        }
+
+        public bool IsNewOrderMode => !IsEditOrderMode;
+        public string CurrentOrderModeKey => IsEditOrderMode ? "EDIT_ORDER_MODE" : "NEW_ORDER_MODE";
+        public string CurrentOrderModeDescription => IsEditOrderMode
+            ? "Đang sửa order mở của bàn đã chọn. Món đã báo bếp chỉ có thể gọi thêm."
+            : "Đang tạo order mới.";
+
+        public string PrimaryOrderActionText => IsEditOrderMode ? "LƯU CHỈNH SỬA" : "BÁO CHẾ BIẾN";
         #endregion
 
         #region commands
@@ -212,6 +258,8 @@ namespace QuanLyNhaHang.ViewModel
         public ICommand ClearAllSelectedDishes { get; set; }
         public ICommand Inform_Chef_Of_OrderedDishes { get; set; }
         public ICommand SwitchCustomerTable { get; set; }
+        public ICommand LoadOpenOrderForSelectedTable_Command { get; set; }
+        public ICommand CancelOrderEditing_Command { get; set; }
         #endregion
 
         #region methods
@@ -231,22 +279,32 @@ namespace QuanLyNhaHang.ViewModel
             {
                 if (item.ID == ID)
                 {
-                    DecSubtotal += item.Price;
-                    StrSubtotal = String.Format("{0:0,0 VND}", DecSubtotal);
                     SelectedMenuItem x = checkIfAnItemIsInOrderItems(ID);
                     if (x != null)
                     {
                         x.Quantity++;
+                        DecSubtotal += item.Price;
+                        StrSubtotal = String.Format("{0:0,0 VND}", DecSubtotal);
                         return;
                     }
-                    SelectedMenuItem s_item = new SelectedMenuItem(item.ID, item.FoodName, item.Price, 1);
+
+                    SelectedMenuItem s_item = new SelectedMenuItem(item.ID, item.FoodName, item.Price, 1, false);
                     SelectedItems.Add(s_item);
+                    DecSubtotal += item.Price;
+                    StrSubtotal = String.Format("{0:0,0 VND}", DecSubtotal);
                     break;
                 }
             }
         }
         private void RemoveAnItem(SelectedMenuItem x)
         {
+            if (x.IsLockedByChef)
+            {
+                MyMessageBox mess = new MyMessageBox("Món đã báo bếp chỉ có thể gọi thêm.");
+                mess.Show();
+                return;
+            }
+
             DecSubtotal -= x.Price;
             StrSubtotal = String.Format("{0:0,0 VND}", DecSubtotal);
             if (x.Quantity > 1)
@@ -279,6 +337,90 @@ namespace QuanLyNhaHang.ViewModel
             {
                 _menuItemsView.SortDescriptions.Add(new SortDescription("FoodName", ListSortDirection.Descending));
             }
+        }
+
+        private void LoadOpenOrderForSelectedTable()
+        {
+            if (SelectedTable == null)
+            {
+                return;
+            }
+
+            if (SelectedTable.Status != 0)
+            {
+                _currentOpenOrderId = 0;
+                IsEditOrderMode = false;
+                SelectedItems = new ObservableCollection<SelectedMenuItem>();
+                RefreshSubtotal();
+                return;
+            }
+
+            try
+            {
+                int tableId = Convert.ToInt32(SelectedTable.NumOfTable);
+                int openOrderId = MenuDP.Flag.GetOpenOrderByTable(tableId);
+                if (openOrderId <= 0)
+                {
+                    _currentOpenOrderId = 0;
+                    IsEditOrderMode = false;
+                    SelectedItems = new ObservableCollection<SelectedMenuItem>();
+                    RefreshSubtotal();
+                    return;
+                }
+
+                ObservableCollection<SelectedMenuItem> openItems = MenuDP.Flag.GetOpenOrderItems(openOrderId);
+                _isLoadingOrder = true;
+                SelectedItems = openItems;
+                _isLoadingOrder = false;
+                _currentOpenOrderId = openOrderId;
+                IsEditOrderMode = true;
+                RefreshSubtotal();
+            }
+            catch (Exception ex)
+            {
+                _isLoadingOrder = false;
+                MyMessageBox mess = new MyMessageBox(ex.Message);
+                mess.Show();
+            }
+        }
+
+        private void SaveCurrentOrderChanges()
+        {
+            if (!IsEditOrderMode || SelectedTable == null || _currentOpenOrderId <= 0)
+            {
+                MyMessageBox mess = new MyMessageBox("Không tìm thấy order mở để cập nhật.");
+                mess.Show();
+                return;
+            }
+
+            try
+            {
+                int tableId = Convert.ToInt32(SelectedTable.NumOfTable);
+                MenuDP.Flag.UpdateOpenOrder(_currentOpenOrderId, tableId, SelectedItems);
+                MyMessageBox mess = new MyMessageBox("Đã lưu chỉnh sửa order thành công!");
+                mess.Show();
+                LoadOpenOrderForSelectedTable();
+            }
+            catch (InvalidOperationException ex)
+            {
+                MyMessageBox mess = new MyMessageBox(ex.Message);
+                mess.Show();
+            }
+            catch (SqlException)
+            {
+                MyMessageBox mess = new MyMessageBox("Lỗi cơ sở dữ liệu khi lưu chỉnh sửa order.");
+                mess.Show();
+            }
+        }
+
+        private void CancelOrderEditing()
+        {
+            if (!IsEditOrderMode)
+            {
+                return;
+            }
+
+            LoadOpenOrderForSelectedTable();
         }
         #endregion
 
@@ -322,6 +464,19 @@ namespace QuanLyNhaHang.ViewModel
         {
             return LoginWindowVM.MaNV;
         }
+
+        private void RefreshSubtotal()
+        {
+            decimal subtotal = 0;
+            foreach (SelectedMenuItem item in SelectedItems)
+            {
+                subtotal += item.Price * item.Quantity;
+            }
+
+            DecSubtotal = subtotal;
+            StrSubtotal = String.Format("{0:0,0 VND}", DecSubtotal);
+        }
+
         private void HasEnoughIngredients()
         {
             Models.Kho x = null;

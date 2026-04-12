@@ -115,6 +115,219 @@ namespace QuanLyNhaHang.DataProvider
             }
             return tables;
         }
+
+        public int GetOpenOrderByTable(int tableId)
+        {
+            try
+            {
+                DBOpen();
+                using SqlCommand cmd = new SqlCommand(
+                    "SELECT TOP (1) SoHD FROM HOADON WHERE SoBan = @soBan AND TrangThai = N'Chưa trả' ORDER BY SoHD DESC",
+                    SqlCon);
+                cmd.Parameters.AddWithValue("@soBan", tableId);
+                object? value = cmd.ExecuteScalar();
+                if (value == null || value == DBNull.Value)
+                {
+                    return 0;
+                }
+
+                return Convert.ToInt32(value);
+            }
+            finally
+            {
+                DBClose();
+            }
+        }
+
+        public bool CanEditDishInOpenOrder(int soHd, string maMon)
+        {
+            try
+            {
+                DBOpen();
+                using SqlCommand cmd = new SqlCommand(
+                    "SELECT CASE WHEN EXISTS (" +
+                    "    SELECT 1 " +
+                    "    FROM HOADON h " +
+                    "    JOIN CHEBIEN c ON c.SoBan = h.SoBan " +
+                    "    WHERE h.SoHD = @soHd " +
+                    "      AND c.MaMon = @maMon " +
+                    "      AND c.TrangThai IN (N'Đang chế biến', N'XONG')" +
+                    ") THEN 0 ELSE 1 END",
+                    SqlCon);
+                cmd.Parameters.AddWithValue("@soHd", soHd);
+                cmd.Parameters.AddWithValue("@maMon", maMon);
+                return Convert.ToInt32(cmd.ExecuteScalar()) == 1;
+            }
+            finally
+            {
+                DBClose();
+            }
+        }
+
+        public ObservableCollection<SelectedMenuItem> GetOpenOrderItems(int soHd)
+        {
+            ObservableCollection<SelectedMenuItem> items = new ObservableCollection<SelectedMenuItem>();
+            try
+            {
+                DBOpen();
+                string query =
+                    "SELECT c.MaMon, m.TenMon, m.Gia, c.SoLuong, " +
+                    "CASE WHEN EXISTS (" +
+                    "   SELECT 1 FROM CHEBIEN cb " +
+                    "   JOIN HOADON h2 ON h2.SoBan = cb.SoBan " +
+                    "   WHERE h2.SoHD = c.SoHD " +
+                    "     AND cb.MaMon = c.MaMon " +
+                    "     AND cb.TrangThai IN (N'Đang chế biến', N'XONG')" +
+                    ") THEN CAST(1 AS bit) ELSE CAST(0 AS bit) END AS IsLockedByChef " +
+                    "FROM CTHD c " +
+                    "JOIN MENU m ON m.MaMon = c.MaMon " +
+                    "WHERE c.SoHD = @soHd";
+
+                using SqlCommand cmd = new SqlCommand(query, SqlCon);
+                cmd.Parameters.AddWithValue("@soHd", soHd);
+                using SqlDataReader reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    string maMon = reader.GetString(0);
+                    string tenMon = reader.GetString(1);
+                    decimal gia = reader.GetDecimal(2);
+                    int soLuong = Convert.ToInt32(reader.GetValue(3));
+                    bool isLocked = reader.GetBoolean(4);
+                    items.Add(new SelectedMenuItem(maMon, tenMon, gia, soLuong, isLocked));
+                }
+            }
+            finally
+            {
+                DBClose();
+            }
+
+            return items;
+        }
+
+        public void UpdateOpenOrder(int soHd, int soBan, ObservableCollection<SelectedMenuItem> updatedItems)
+        {
+            DBOpen();
+            SqlTransaction transaction = SqlCon.BeginTransaction();
+            try
+            {
+                EnsureOpenOrderExists(soHd, soBan, transaction);
+                Dictionary<string, int> existing = GetExistingOrderDetails(soHd, transaction);
+                HashSet<string> lockedDishIds = GetLockedDishIdsForOrder(soHd, transaction);
+
+                Dictionary<string, SelectedMenuItem> updated = new Dictionary<string, SelectedMenuItem>(StringComparer.OrdinalIgnoreCase);
+                foreach (SelectedMenuItem item in updatedItems)
+                {
+                    if (item.Quantity <= 0)
+                    {
+                        throw new InvalidOperationException("Số lượng món phải lớn hơn 0.");
+                    }
+
+                    updated[item.ID] = item;
+                }
+
+                foreach (string lockedDishId in lockedDishIds)
+                {
+                    int oldQty = existing.TryGetValue(lockedDishId, out int oldVal) ? oldVal : 0;
+                    int newQty = updated.TryGetValue(lockedDishId, out SelectedMenuItem? newItem) ? newItem.Quantity : 0;
+                    if (newQty < oldQty)
+                    {
+                        throw new InvalidOperationException("Món đã báo bếp chỉ có thể gọi thêm, không thể giảm hoặc xóa.");
+                    }
+                }
+
+                HashSet<string> allDishIds = new HashSet<string>(existing.Keys, StringComparer.OrdinalIgnoreCase);
+                foreach (string dishId in updated.Keys)
+                {
+                    allDishIds.Add(dishId);
+                }
+
+                foreach (string dishId in allDishIds)
+                {
+                    int oldQty = existing.TryGetValue(dishId, out int oldValue) ? oldValue : 0;
+                    int newQty = updated.TryGetValue(dishId, out SelectedMenuItem? newItem) ? newItem.Quantity : 0;
+                    int delta = newQty - oldQty;
+
+                    if (delta == 0)
+                    {
+                        continue;
+                    }
+
+                    if (delta < 0 && lockedDishIds.Contains(dishId))
+                    {
+                        throw new InvalidOperationException("Món đã báo bếp chỉ có thể gọi thêm, không thể giảm hoặc xóa.");
+                    }
+
+                    AdjustIngredientStockForDish(dishId, delta, transaction);
+
+                    if (oldQty == 0 && newQty > 0)
+                    {
+                        using SqlCommand insertDetail = new SqlCommand(
+                            "INSERT INTO CTHD (SoHD, MaMon, SoLuong) VALUES (@soHd, @maMon, @soLuong)",
+                            SqlCon,
+                            transaction);
+                        insertDetail.Parameters.AddWithValue("@soHd", soHd);
+                        insertDetail.Parameters.AddWithValue("@maMon", dishId);
+                        insertDetail.Parameters.AddWithValue("@soLuong", newQty);
+                        insertDetail.ExecuteNonQuery();
+                    }
+                    else if (newQty == 0)
+                    {
+                        using SqlCommand deleteDetail = new SqlCommand(
+                            "DELETE FROM CTHD WHERE SoHD = @soHd AND MaMon = @maMon",
+                            SqlCon,
+                            transaction);
+                        deleteDetail.Parameters.AddWithValue("@soHd", soHd);
+                        deleteDetail.Parameters.AddWithValue("@maMon", dishId);
+                        deleteDetail.ExecuteNonQuery();
+                    }
+                    else
+                    {
+                        using SqlCommand updateDetail = new SqlCommand(
+                            "UPDATE CTHD SET SoLuong = @soLuong WHERE SoHD = @soHd AND MaMon = @maMon",
+                            SqlCon,
+                            transaction);
+                        updateDetail.Parameters.AddWithValue("@soLuong", newQty);
+                        updateDetail.Parameters.AddWithValue("@soHd", soHd);
+                        updateDetail.Parameters.AddWithValue("@maMon", dishId);
+                        updateDetail.ExecuteNonQuery();
+                    }
+
+                    if (delta > 0)
+                    {
+                        using SqlCommand insertChef = new SqlCommand(
+                            "INSERT INTO CHEBIEN (MaMon, SoBan, SoLuong, NgayCB, TrangThai) VALUES (@maMon, @soBan, @soLuong, @ngayCB, @trangThai)",
+                            SqlCon,
+                            transaction);
+                        insertChef.Parameters.AddWithValue("@maMon", dishId);
+                        insertChef.Parameters.AddWithValue("@soBan", soBan);
+                        insertChef.Parameters.AddWithValue("@soLuong", delta);
+                        insertChef.Parameters.AddWithValue("@ngayCB", DateTime.Now);
+                        insertChef.Parameters.AddWithValue("@trangThai", "Đang chế biến");
+                        insertChef.ExecuteNonQuery();
+                    }
+                }
+
+                using (SqlCommand updateBill = new SqlCommand(
+                    "UPDATE HOADON SET TriGia = ISNULL((SELECT SUM(c.SoLuong * m.Gia) FROM CTHD c JOIN MENU m ON m.MaMon = c.MaMon WHERE c.SoHD = @soHd), 0) WHERE SoHD = @soHd",
+                    SqlCon,
+                    transaction))
+                {
+                    updateBill.Parameters.AddWithValue("@soHd", soHd);
+                    updateBill.ExecuteNonQuery();
+                }
+
+                transaction.Commit();
+            }
+            catch
+            {
+                transaction.Rollback();
+                throw;
+            }
+            finally
+            {
+                DBClose();
+            }
+        }
         
         public void AddDish(MenuItem x)
         {
@@ -568,6 +781,119 @@ namespace QuanLyNhaHang.DataProvider
             if (deletedCount == 0)
             {
                 throw new InvalidOperationException("Không tìm thấy món để xóa.");
+            }
+        }
+
+        private void EnsureOpenOrderExists(int soHd, int soBan, SqlTransaction transaction)
+        {
+            using SqlCommand cmd = new SqlCommand(
+                "SELECT COUNT(1) FROM HOADON WITH (UPDLOCK, HOLDLOCK) WHERE SoHD = @soHd AND SoBan = @soBan AND TrangThai = N'Chưa trả'",
+                SqlCon,
+                transaction);
+            cmd.Parameters.AddWithValue("@soHd", soHd);
+            cmd.Parameters.AddWithValue("@soBan", soBan);
+            if (Convert.ToInt32(cmd.ExecuteScalar()) == 0)
+            {
+                throw new InvalidOperationException("Không tìm thấy order mở cho bàn đã chọn.");
+            }
+        }
+
+        private Dictionary<string, int> GetExistingOrderDetails(int soHd, SqlTransaction transaction)
+        {
+            Dictionary<string, int> result = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            using SqlCommand cmd = new SqlCommand(
+                "SELECT MaMon, SoLuong FROM CTHD WITH (UPDLOCK, HOLDLOCK) WHERE SoHD = @soHd",
+                SqlCon,
+                transaction);
+            cmd.Parameters.AddWithValue("@soHd", soHd);
+            using SqlDataReader reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                result[reader.GetString(0)] = Convert.ToInt32(reader.GetValue(1));
+            }
+            return result;
+        }
+
+        private HashSet<string> GetLockedDishIdsForOrder(int soHd, SqlTransaction transaction)
+        {
+            HashSet<string> result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            using SqlCommand cmd = new SqlCommand(
+                "SELECT DISTINCT c.MaMon " +
+                "FROM CTHD c " +
+                "JOIN HOADON h ON h.SoHD = c.SoHD " +
+                "WHERE c.SoHD = @soHd " +
+                "AND EXISTS (" +
+                "   SELECT 1 FROM CHEBIEN cb " +
+                "   WHERE cb.SoBan = h.SoBan " +
+                "   AND cb.MaMon = c.MaMon " +
+                "   AND cb.TrangThai IN (N'Đang chế biến', N'XONG')" +
+                ")",
+                SqlCon,
+                transaction);
+            cmd.Parameters.AddWithValue("@soHd", soHd);
+            using SqlDataReader reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                result.Add(reader.GetString(0));
+            }
+            return result;
+        }
+
+        private void AdjustIngredientStockForDish(string maMon, int deltaQuantity, SqlTransaction transaction)
+        {
+            if (deltaQuantity == 0)
+            {
+                return;
+            }
+
+            List<(string ingredientName, float recipeQuantity)> recipeRows = new List<(string ingredientName, float recipeQuantity)>();
+            using (SqlCommand cmd = new SqlCommand(
+                "SELECT TenNL, SoLuong FROM CHITIETMON WITH (UPDLOCK, HOLDLOCK) WHERE MaMon = @maMon",
+                SqlCon,
+                transaction))
+            {
+                cmd.Parameters.AddWithValue("@maMon", maMon);
+                using SqlDataReader reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    recipeRows.Add((reader.GetString(0), (float)Convert.ToDouble(reader.GetValue(1))));
+                }
+            }
+
+            if (deltaQuantity > 0 && recipeRows.Count == 0)
+            {
+                throw new InvalidOperationException("Món chưa có định mức nguyên liệu, không thể báo chế biến.");
+            }
+
+            foreach ((string ingredientName, float recipeQuantity) in recipeRows)
+            {
+                double quantityChange = recipeQuantity * deltaQuantity;
+
+                using SqlCommand getStock = new SqlCommand(
+                    "SELECT TonDu FROM KHO WITH (UPDLOCK, HOLDLOCK) WHERE TenSanPham = @tenSanPham",
+                    SqlCon,
+                    transaction);
+                getStock.Parameters.AddWithValue("@tenSanPham", ingredientName);
+                object? stockValue = getStock.ExecuteScalar();
+                if (stockValue == null || stockValue == DBNull.Value)
+                {
+                    throw new InvalidOperationException("Không tìm thấy nguyên liệu trong kho: " + ingredientName);
+                }
+
+                double currentStock = Convert.ToDouble(stockValue);
+                double newStock = currentStock - quantityChange;
+                if (newStock < 0)
+                {
+                    throw new InvalidOperationException("Không đủ nguyên liệu trong kho: " + ingredientName);
+                }
+
+                using SqlCommand updateStock = new SqlCommand(
+                    "UPDATE KHO SET TonDu = @tonDu WHERE TenSanPham = @tenSanPham",
+                    SqlCon,
+                    transaction);
+                updateStock.Parameters.AddWithValue("@tonDu", newStock);
+                updateStock.Parameters.AddWithValue("@tenSanPham", ingredientName);
+                updateStock.ExecuteNonQuery();
             }
         }
 
