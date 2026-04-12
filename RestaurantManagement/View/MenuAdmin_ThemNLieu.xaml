@@ -10,132 +10,211 @@
         xmlns:local="clr-namespace:RestaurantManagement.View"
         WindowStyle="None"
         x:Name="IngreWindow"
-        TextElement.FontFamily="Comfortaa Light"
+        TextElement.FontFamily="Comfortaa"
         mc:Ignorable="d"
-        Height="600" Width="900" WindowStartupLocation="CenterScreen">
-    <Grid>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="2*"/>
-            <ColumnDefinition Width="30"/>
-            <ColumnDefinition Width="*"/>
-        </Grid.ColumnDefinitions>
-        <Grid>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="60"/>
-                <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
-            <StackPanel Orientation="Horizontal" Margin="20 0 20 0">
-                <TextBox FontSize="15" 
-                         Margin="0 15 0 0"
-                         Text="{Binding IngreFilterText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                         materialDesign:HintAssist.Hint="Tìm kiếm nguyên liệu" 
-                         Width="180" 
-                         Height="35"/>
-                <Button Background="#1c3879"
-                        Command="{Binding SaveDishIngredients_Command}"
-                        Margin="20 0 0 0"
-                        Width="100"
-                        Content="Lưu"/>
-                <Button Background="#1c3879" 
-                        Command="{Binding AddIngredientsToDish_Command}"
-                        Margin="20 0 0 0" 
-                        Content="Thêm nguyên liệu" 
-                        Width="180"/>
-            </StackPanel>
+        Height="750" Width="1200" WindowStartupLocation="CenterScreen"
+        AllowsTransparency="True" Background="Transparent">
 
-            <ListView SelectedIndex="0" 
-                      FontSize="14"
-                      ItemsSource="{Binding IngredientCollection, UpdateSourceTrigger=PropertyChanged}"
-                      SelectedItem="{Binding Selected_Ingredient}"
-                      Margin="20" 
-                      Grid.Row="1" 
-                      IsSynchronizedWithCurrentItem="True" 
-                      HorizontalAlignment="Center"
-                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                      VerticalAlignment="Stretch">
-                <ListView.View>
-                    <GridView>
-                        <GridViewColumn Header="Tên sản phẩm" Width="160" DisplayMemberBinding="{Binding TenSanPham}"/>
-                        <GridViewColumn Header="Đơn vị" Width="140" DisplayMemberBinding="{Binding DonVi}"/>
-                        <GridViewColumn Header="Đơn giá" Width="140" DisplayMemberBinding="{Binding DonGia}" />
-                        <GridViewColumn Header="Tồn dư" Width="140"  DisplayMemberBinding="{Binding TonDu}"/>
-                    </GridView>
-                </ListView.View>
-            </ListView>
-        </Grid>
-        <Grid Grid.Column="2" Margin="0 0 20 20">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="30"/>
-                <RowDefinition Height="70"/>
-                <RowDefinition Height="15"/>
-                <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
-            <Button Background="Transparent"
-                    Command="{Binding HideIngredientWindow_Command}"
-                    CommandParameter="{Binding ElementName=IngreWindow}"
-                    BorderThickness="0"
-                    HorizontalAlignment="Right">
-                <fa:IconImage Icon="PowerOff" Foreground="#1c3879"/>
-            </Button>
-            <TextBlock Text="Nguyên liệu cần thiết" 
-                       Grid.Row="1"
-                       TextAlignment="Center"
-                       FontSize="20"
-                       Foreground="#3A4F7A"
-                       FontWeight="SemiBold"
-                       VerticalAlignment="Center"/>
-            <Separator Grid.Row="2"
-                       Background="#1c3879"
-                       Margin="15 0" />
-            <ScrollViewer Grid.Row="3">
-                <StackPanel Orientation="Vertical" x:Name="border">
-                    <Border>
-                        <StackPanel Orientation="Horizontal">
-                            <ItemsControl x:Name="itemsource" ItemsSource="{Binding Ingredients_ForDishes, Mode=OneWay, UpdateSourceTrigger=PropertyChanged}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Border BorderThickness="0,0,0,1" BorderBrush="#1C3879" Width="{Binding ActualWidth, ElementName=border}" Height="50">
-                                            <Grid>
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="50"/>
-                                                    <ColumnDefinition Width="100"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                </Grid.ColumnDefinitions>
-                                                <Button 
-                                                                    Command="{Binding Path=DataContext.RemoveIngredientFromDish_Command, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
-                                                                    CommandParameter="{Binding}"
-                                                                    Background="Transparent" 
-                                                                    BorderThickness="0">
-                                                    <fa:IconImage Icon="TrashCan" Foreground="#1C3879" Height="14" Width="14" />
-                                                </Button>
-                                                <TextBlock Grid.Column="1"  
-                                                           TextAlignment="Left" 
-                                                           VerticalAlignment="Center" 
-                                                           FontSize="14" 
-                                                           FontWeight="SemiBold"
-                                                           Text="{Binding TenNL}"/>
-                                                <StackPanel Grid.Column="2" Orientation="Horizontal">
-                                                    <TextBlock Text="SL: "
-                                                               FontSize="14"
-                                                               VerticalAlignment="Center"
-                                                               FontWeight="SemiBold" />
-                                                    <TextBox Grid.Column="2"  
-                                                         TextAlignment="Center" 
-                                                         FontSize="14" 
-                                                         FontWeight="SemiBold" 
-                                                         VerticalAlignment="Center"
-                                                         Width="30"
-                                                         Text="{Binding SoLuong, Mode=TwoWay}" />
-                                                </StackPanel>
-                                            </Grid>
-                                        </Border>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </StackPanel>
+    <Window.DataContext>
+        <vm:MenuAdminViewModel />
+    </Window.DataContext>
+
+    <Grid Margin="15">
+        <Border Background="#F4F6F9" CornerRadius="12">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="20" ShadowDepth="3" Opacity="0.15" Color="#000000"/>
+            </Border.Effect>
+
+            <Grid>
+                <Button Command="{Binding HideIngredientWindow_Command}" CommandParameter="{Binding ElementName=IngreWindow}"
+                        HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0 10 10 0" Panel.ZIndex="99"
+                        Background="Transparent" BorderThickness="0" Width="35" Height="35" Cursor="Hand">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border Background="{TemplateBinding Background}" CornerRadius="17.5">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                        </ControlTemplate>
+                    </Button.Template>
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Setter Property="Foreground" Value="#94A3B8"/>
+                            <Style.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Background" Value="#FEE2E2"/>
+                                    <Setter Property="Foreground" Value="#EF4444"/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                    <fa:IconImage Icon="Times" Width="18" Height="18" Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}"/>
+                </Button>
+
+                <Grid Margin="20 30 20 20">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="6*"/>
+                        <ColumnDefinition Width="4*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Border Grid.Column="0" Background="White" CornerRadius="12" Margin="0 0 10 0">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="10" ShadowDepth="1" Opacity="0.05" Color="#000000"/>
+                        </Border.Effect>
+
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <Grid Grid.Row="0" Margin="25 25 25 15">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <Border Grid.Column="0" Background="#F1F5F9" CornerRadius="8" Padding="15 0" Height="50" Margin="0 0 15 0">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <fa:IconImage Grid.Column="0" Icon="Search" Width="20" Height="20" Foreground="#94A3B8" VerticalAlignment="Center" Margin="0 0 10 0"/>
+                                        <TextBox Grid.Column="1" Text="{Binding IngreFilterText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                 materialDesign:HintAssist.Hint="Tìm kiếm nguyên liệu..." FontSize="16" Foreground="#1E293B"
+                                                 BorderThickness="0" Background="Transparent" VerticalAlignment="Center"
+                                                 materialDesign:TextFieldAssist.DecorationVisibility="Hidden"/>
+                                    </Grid>
+                                </Border>
+
+                                <Button Grid.Column="1" Command="{Binding AddIngredientsToDish_Command}"
+                                        Background="#1C3879" Foreground="White" BorderThickness="0" Height="50" Padding="15 0"
+                                        materialDesign:ButtonAssist.CornerRadius="8" Cursor="Hand">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="Thêm vào món" FontSize="15" FontWeight="Bold" VerticalAlignment="Center" Margin="0 0 10 0"/>
+                                        <fa:IconImage Icon="ArrowRight" Width="16" Height="16" Foreground="White" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
+                            </Grid>
+
+                            <Separator Grid.Row="0" VerticalAlignment="Bottom" Background="#E2E8F0" Margin="20 0"/>
+
+                            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="15 10 15 15">
+                                <ListView ItemsSource="{Binding IngredientCollection, UpdateSourceTrigger=PropertyChanged}"
+                                          SelectedItem="{Binding Selected_Ingredient}"
+                                          FontSize="16" BorderThickness="0" Background="Transparent" HorizontalContentAlignment="Stretch"
+                                          IsSynchronizedWithCurrentItem="True" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                    <ListView.ItemContainerStyle>
+                                        <Style TargetType="ListViewItem">
+                                            <Setter Property="Padding" Value="5 10"/>
+                                            <Setter Property="Margin" Value="0 2"/>
+                                            <Setter Property="BorderThickness" Value="0 0 0 1"/>
+                                            <Setter Property="BorderBrush" Value="#F1F5F9"/>
+                                        </Style>
+                                    </ListView.ItemContainerStyle>
+                                    <ListView.View>
+                                        <GridView>
+                                            <GridViewColumn Header="Tên nguyên liệu" Width="280">
+                                                <GridViewColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <TextBlock Text="{Binding TenSanPham}" TextWrapping="Wrap" Foreground="#1E293B"/>
+                                                    </DataTemplate>
+                                                </GridViewColumn.CellTemplate>
+                                            </GridViewColumn>
+                                            <GridViewColumn Header="Tồn dư" Width="115">
+                                                <GridViewColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <TextBlock Text="{Binding TonDu}" FontWeight="Bold" Foreground="#10B981" HorizontalAlignment="Center"/>
+                                                    </DataTemplate>
+                                                </GridViewColumn.CellTemplate>
+                                            </GridViewColumn>
+                                            <GridViewColumn Header="Đơn vị" Width="115" DisplayMemberBinding="{Binding DonVi}"/>
+                                            <GridViewColumn Header="Đơn giá" Width="150">
+                                                <GridViewColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <TextBlock Text="{Binding DonGia}" FontWeight="SemiBold" Foreground="#E63946" HorizontalAlignment="Right"/>
+                                                    </DataTemplate>
+                                                </GridViewColumn.CellTemplate>
+                                            </GridViewColumn>
+                                        </GridView>
+                                    </ListView.View>
+                                </ListView>
+                            </ScrollViewer>
+                        </Grid>
                     </Border>
-                </StackPanel>
-            </ScrollViewer>
-        </Grid>
+
+                    <Border Grid.Column="1" Background="White" CornerRadius="12" Margin="10 0 0 0">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="10" ShadowDepth="1" Opacity="0.05" Color="#000000"/>
+                        </Border.Effect>
+
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <StackPanel Grid.Row="0" Margin="25 25 25 15" Orientation="Horizontal">
+                                <fa:IconImage Icon="Receipt" Width="24" Height="24" Foreground="#1C3879" Margin="0 0 10 0" VerticalAlignment="Center"/>
+                                <TextBlock Text="CÔNG THỨC MÓN ĂN" FontSize="20" Foreground="#1E293B" FontWeight="Bold" VerticalAlignment="Center"/>
+                            </StackPanel>
+
+                            <Separator Grid.Row="0" VerticalAlignment="Bottom" Background="#E2E8F0" Margin="20 0"/>
+
+                            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="15 10 15 15">
+                                <ItemsControl ItemsSource="{Binding Ingredients_ForDishes, Mode=OneWay, UpdateSourceTrigger=PropertyChanged}" 
+                                              HorizontalContentAlignment="Stretch">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border BorderThickness="0,0,0,1" BorderBrush="#E2E8F0" Padding="5 15" Margin="0 2">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <Button Grid.Column="0" Command="{Binding Path=DataContext.RemoveIngredientFromDish_Command, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                                            CommandParameter="{Binding}" Background="Transparent" BorderThickness="0" Width="35" Height="35" Padding="0" Cursor="Hand" Margin="0 0 15 0">
+                                                        <fa:IconImage Icon="TrashCan" Foreground="#EF4444" Height="18" Width="18" />
+                                                    </Button>
+
+                                                    <TextBlock Grid.Column="1" Text="{Binding TenNL}" TextWrapping="Wrap" VerticalAlignment="Center" FontSize="16" FontWeight="SemiBold" Foreground="#1E293B"/>
+
+                                                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                                        <TextBlock Text="SL:" FontSize="15" Foreground="#64748B" VerticalAlignment="Center" Margin="0 0 8 0" FontWeight="SemiBold"/>
+                                                        <TextBox Text="{Binding SoLuong, Mode=TwoWay}" Width="60" Height="36" FontSize="16" FontWeight="Bold" Foreground="#1C3879"
+                                                                 HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                                                                 BorderBrush="#CBD5E1" BorderThickness="1" materialDesign:TextFieldAssist.DecorationVisibility="Hidden">
+                                                            <TextBox.Resources>
+                                                                <Style TargetType="Border">
+                                                                    <Setter Property="CornerRadius" Value="4"/>
+                                                                </Style>
+                                                            </TextBox.Resources>
+                                                        </TextBox>
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+
+                            <Border Grid.Row="2" Background="#F8FAFC" CornerRadius="0 0 12 12" Padding="25">
+                                <Button Command="{Binding SaveDishIngredients_Command}" Background="#10B981" Foreground="White" BorderThickness="0"
+                                        Height="50" materialDesign:ButtonAssist.CornerRadius="8" Cursor="Hand">
+                                    <StackPanel Orientation="Horizontal">
+                                        <fa:IconImage Icon="Save" Width="18" Height="18" Foreground="White" Margin="0 0 10 0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="LƯU LẠI CÔNG THỨC" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
+                            </Border>
+
+                        </Grid>
+                    </Border>
+                </Grid>
+            </Grid>
+        </Border>
     </Grid>
 </Window>

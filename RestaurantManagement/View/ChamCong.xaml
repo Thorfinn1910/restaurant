@@ -8,7 +8,7 @@
         xmlns:local1="clr-namespace:QuanLyNhaHang.ViewModel"
         mc:Ignorable="d"
         Name="chamCong"
-        Title="ChamCong" Height="550" Width="950"
+        Title="Chấm Công" Height="600" Width="1000"
         TextElement.FontWeight="Regular"
         TextElement.FontSize="16"
         TextElement.FontFamily="Comfortaa"
@@ -20,185 +20,242 @@
         WindowStyle="None"
         AllowsTransparency="True"
         WindowStartupLocation="CenterScreen">
+
     <Window.DataContext>
         <local1:ChamCongViewModel/>
     </Window.DataContext>
+
     <Grid>
-        <Border CornerRadius="10"
-                BorderThickness="2"
-                BorderBrush="Black"
-                Background="#EEEEEE"/>
-        <Button Margin="926 4 4 526"
-                Height="20"
-                Width="20"
-                Cursor="Hand"
-                Command="{Binding CloseCM}"
-                CommandParameter="{Binding ElementName=chamCong}"
-                materialDesign:ButtonAssist.CornerRadius="0,10,0,0"
-                BorderThickness="0"
-                Background="Transparent">
-            <fa:IconImage Icon="PowerOff"
-                          Height="20"
-                          Width="20"
-                          Margin="-27 -4 -15 -4"/>
-        </Button>
+        <Grid.Resources>
+            <Style x:Key="CloseButtonStyle" TargetType="Button">
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="Foreground" Value="#94A3B8"/>
+                <Setter Property="Width" Value="32"/>
+                <Setter Property="Height" Value="32"/>
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border Background="{TemplateBinding Background}" CornerRadius="16">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+                <Style.Triggers>
+                    <Trigger Property="IsMouseOver" Value="True">
+                        <Setter Property="Background" Value="#FEE2E2"/>
+                        <Setter Property="Foreground" Value="#EF4444"/>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
 
-        <Grid>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="2*"/>
-                <ColumnDefinition Width="1*"/>
-            </Grid.ColumnDefinitions>
+            <Style x:Key="PrimaryButton" TargetType="Button" BasedOn="{StaticResource MaterialDesignRaisedButton}">
+                <Setter Property="Background" Value="#1C3879"/>
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="Foreground" Value="White"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="materialDesign:ButtonAssist.CornerRadius" Value="6"/>
+                <Style.Triggers>
+                    <Trigger Property="IsMouseOver" Value="True">
+                        <Setter Property="Background" Value="#2A4893"/>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+        </Grid.Resources>
 
-            <Grid Grid.Column="0">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="1*"/>
-                    <RowDefinition Height="8*"/>
-                </Grid.RowDefinitions>
+        <Border Background="#F4F6F9" CornerRadius="12" Margin="15">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="20" ShadowDepth="3" Opacity="0.15" Color="#000000"/>
+            </Border.Effect>
 
-                <Grid Grid.Row="0">
+            <Grid>
+                <Button Style="{StaticResource CloseButtonStyle}" Panel.ZIndex="999"
+                        HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0 10 10 0"
+                        Command="{Binding CloseCM}" CommandParameter="{Binding ElementName=chamCong}">
+                    <fa:IconImage Icon="Times" Width="16" Height="16" Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}"/>
+                </Button>
+
+                <Grid Margin="20 30 20 20">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="2*"/>
-                        <ColumnDefinition Width="1*"/>
-                        <ColumnDefinition Width="2*"/>
+                        <ColumnDefinition Width="6.5*"/>
+                        <ColumnDefinition Width="3.5*"/>
                     </Grid.ColumnDefinitions>
 
-                    <Label Content="Bảng chấm công tháng :"
-                           FontSize="16"
-                           VerticalAlignment="Center"
-                           HorizontalAlignment="Center"/>
+                    <Border Grid.Column="0" Background="White" CornerRadius="12" Margin="0 0 10 0">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="10" ShadowDepth="1" Opacity="0.05" Color="#000000"/>
+                        </Border.Effect>
 
-                    <ComboBox ItemsSource="{Binding ListMonth}"
-                              SelectedItem="{Binding MonthSelected}"
-                              Grid.Column="1" Height="31">
-                    </ComboBox>
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
 
-                    <Button Grid.Column="2"
-                            Command="{Binding ExportCM}"
-                            Background="#1C3879"
-                            Margin="15 5 15 5"
-                            Foreground="White"
-                            BorderThickness="0"
-                            Content="Xuất file chi tiết"
-                            Cursor="Hand">
-                    </Button>
-                </Grid>
+                            <Grid Grid.Row="0" Margin="20 20 20 15">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
 
-                <Grid Grid.Row="1">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto">
-                        <ListView ItemsSource="{Binding ListStaff}"
-                                  Margin="10 0 10 10" SelectionChanged="ListView_SelectionChanged">
-                            <ListView.View>
-                                <GridView>
-                                    <GridViewColumn Width="250"
-                                                    Header="Họ tên">
-                                        <GridViewColumn.CellTemplate>
-                                            <DataTemplate>
-                                                <TextBlock Text="{Binding HoTen}"
-                                                           VerticalAlignment="Center"
-                                                           Height="23"/>
-                                            </DataTemplate>
-                                        </GridViewColumn.CellTemplate>
-                                    </GridViewColumn>
-                                    <GridViewColumn Width="130"
-                                                    Header="Chức vụ" >
-                                        <GridViewColumn.CellTemplate>
-                                            <DataTemplate>
-                                                <TextBlock Text="{Binding ChucVu}"
-                                                           VerticalAlignment="Center"/>
-                                            </DataTemplate>
-                                        </GridViewColumn.CellTemplate>
-                                    </GridViewColumn>
-                                    <GridViewColumn Width="100">
-                                        <GridViewColumn.CellTemplate>
-                                            <DataTemplate>
-                                                <TextBlock Text="{Binding Fulltime}"
-                                                           VerticalAlignment="Center"/>
-                                            </DataTemplate>
-                                        </GridViewColumn.CellTemplate>
-                                    </GridViewColumn>
-                                    <GridViewColumn Width="150"
-                                                    Header="Tổng số giờ">
-                                        <GridViewColumn.CellTemplate>
-                                            <DataTemplate>
-                                                <TextBlock Text="{Binding TongSoGio}"
-                                                           VerticalAlignment="Center"/>
-                                            </DataTemplate>
-                                        </GridViewColumn.CellTemplate>
-                                    </GridViewColumn>
+                                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <fa:IconImage Icon="CalendarAlt" Width="20" Height="20" Foreground="#1C3879" Margin="0 0 10 0"/>
+                                    <TextBlock Text="Bảng chấm công tháng:" FontWeight="SemiBold" Foreground="#475569" VerticalAlignment="Center"/>
+                                </StackPanel>
 
+                                <ComboBox Grid.Column="1" ItemsSource="{Binding ListMonth}" SelectedItem="{Binding MonthSelected}"
+                                          Width="80" Height="35" Margin="15 0 0 0" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"/>
 
-                                </GridView>
-                            </ListView.View>
-                        </ListView>
-                    </ScrollViewer>
+                                <Button Grid.Column="2" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Right"
+                                        Command="{Binding ExportCM}" Content="Xuất Excel" Height="38" Width="130">
+                                    <Button.ContentTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Orientation="Horizontal">
+                                                <fa:IconImage Icon="FileExcel" Width="16" Height="16" Foreground="White" Margin="0 0 8 0" VerticalAlignment="Center"/>
+                                                <TextBlock Text="{Binding}" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </Button.ContentTemplate>
+                                </Button>
+                            </Grid>
+
+                            <Separator Grid.Row="0" VerticalAlignment="Bottom" Background="#E2E8F0" Margin="20 0"/>
+
+                            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="15 10 15 15">
+                                <ListView ItemsSource="{Binding ListStaff}" SelectionChanged="ListView_SelectionChanged"
+                                          BorderThickness="0" Background="Transparent">
+                                    <ListView.ItemContainerStyle>
+                                        <Style TargetType="ListViewItem">
+                                            <Setter Property="Padding" Value="5 8"/>
+                                            <Setter Property="Margin" Value="0 2"/>
+                                            <Setter Property="BorderThickness" Value="0 0 0 1"/>
+                                            <Setter Property="BorderBrush" Value="#F1F5F9"/>
+                                        </Style>
+                                    </ListView.ItemContainerStyle>
+                                    <ListView.View>
+                                        <GridView>
+                                            <GridViewColumn Width="200" Header="Họ tên">
+                                                <GridViewColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <TextBlock Text="{Binding HoTen}" FontWeight="SemiBold" Foreground="#1E293B" VerticalAlignment="Center"/>
+                                                    </DataTemplate>
+                                                </GridViewColumn.CellTemplate>
+                                            </GridViewColumn>
+
+                                            <GridViewColumn Width="120" Header="Chức vụ" >
+                                                <GridViewColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <TextBlock Text="{Binding ChucVu}" Foreground="#64748B" VerticalAlignment="Center"/>
+                                                    </DataTemplate>
+                                                </GridViewColumn.CellTemplate>
+                                            </GridViewColumn>
+
+                                            <GridViewColumn Width="125" Header="Hình thức">
+                                                <GridViewColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <Border Background="#E0F2FE" CornerRadius="4" Padding="8 2" HorizontalAlignment="Left">
+                                                            <TextBlock Text="{Binding Fulltime}" Foreground="#0284C7" FontSize="13" FontWeight="Bold" VerticalAlignment="Center"/>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </GridViewColumn.CellTemplate>
+                                            </GridViewColumn>
+
+                                            <GridViewColumn Width="135" Header="Tổng số giờ">
+                                                <GridViewColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <TextBlock Text="{Binding TongSoGio}" FontWeight="Bold" Foreground="#10B981" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                                    </DataTemplate>
+                                                </GridViewColumn.CellTemplate>
+                                            </GridViewColumn>
+                                        </GridView>
+                                    </ListView.View>
+                                </ListView>
+                            </ScrollViewer>
+                        </Grid>
+                    </Border>
+
+                    <Border Grid.Column="1" Background="White" CornerRadius="12" Margin="10 0 0 0">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="10" ShadowDepth="1" Opacity="0.05" Color="#000000"/>
+                        </Border.Effect>
+
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <Grid Grid.Row="0" Margin="20 20 20 15">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock Grid.Column="0" Text="Ngày:" FontWeight="SemiBold" Foreground="#475569" VerticalAlignment="Center" Margin="0 0 10 0"/>
+
+                                <ComboBox Grid.Column="1" ItemsSource="{Binding ListDay}" SelectedItem="{Binding DaySelected}"
+                                          Width="90" Height="35" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"/>
+
+                                <Button Grid.Column="2" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Right"
+                                        Command="{Binding SaveCM}" Content="Lưu" Height="38" Width="90" Background="#10B981">
+                                    <Button.ContentTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Orientation="Horizontal">
+                                                <fa:IconImage Icon="Save" Width="16" Height="16" Foreground="White" Margin="0 0 8 0" VerticalAlignment="Center"/>
+                                                <TextBlock Text="{Binding}" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </Button.ContentTemplate>
+                                </Button>
+                            </Grid>
+
+                            <Separator Grid.Row="0" VerticalAlignment="Bottom" Background="#E2E8F0" Margin="20 0"/>
+
+                            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="15 10 15 15">
+                                <ListView ItemsSource="{Binding ListCheck}" SelectedItem="{Binding Selected, Mode=OneWayToSource}"
+                                          BorderThickness="0" Background="Transparent" HorizontalContentAlignment="Stretch">
+                                    <ListView.ItemContainerStyle>
+                                        <Style TargetType="ListViewItem">
+                                            <Setter Property="Padding" Value="5 8"/>
+                                            <Setter Property="Margin" Value="0 2"/>
+                                            <Setter Property="BorderThickness" Value="0 0 0 1"/>
+                                            <Setter Property="BorderBrush" Value="#F1F5F9"/>
+                                        </Style>
+                                    </ListView.ItemContainerStyle>
+                                    <ListView.View>
+                                        <GridView>
+                                            <GridViewColumn Header="Số giờ" Width="105">
+                                                <GridViewColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <TextBox Text="{Binding SoGioCong, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+                                                                 Width="60" Height="30" VerticalContentAlignment="Center" HorizontalContentAlignment="Center"
+                                                                 BorderBrush="#CBD5E1" Foreground="#1E293B" FontWeight="Bold"/>
+                                                    </DataTemplate>
+                                                </GridViewColumn.CellTemplate>
+                                            </GridViewColumn>
+
+                                            <GridViewColumn Header="Ghi chú" Width="190">
+                                                <GridViewColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <TextBox Text="{Binding GhiChu, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+                                                                 Width="175" Height="30" VerticalContentAlignment="Center" Padding="5 0"
+                                                                 BorderBrush="#CBD5E1" Foreground="#64748B"/>
+                                                    </DataTemplate>
+                                                </GridViewColumn.CellTemplate>
+                                            </GridViewColumn>
+                                        </GridView>
+                                    </ListView.View>
+                                </ListView>
+                            </ScrollViewer>
+                        </Grid>
+                    </Border>
                 </Grid>
             </Grid>
-
-
-            <Grid Grid.Column="1">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="1*"/>
-                    <RowDefinition Height="8*"/>
-                </Grid.RowDefinitions>
-
-                <Grid Grid.Row="0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="80"/>
-                        <ColumnDefinition Width="110"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-
-                    <Label Content="Ngày : "
-                           FontSize="16"
-                           VerticalAlignment="Center"
-                           HorizontalAlignment="Center"/>
-
-                    <ComboBox Grid.Column="1"
-                              ItemsSource="{Binding ListDay}"
-                              SelectedItem="{Binding DaySelected}"
-                              Height="31"
-                              Margin="0 0 5 0"/>
-                    <Button Content="Lưu"
-                            Command="{Binding SaveCM}"
-                            Grid.Column="2"
-                            Background="#1C3879"
-                            Margin="5 5 40 5"/>
-                </Grid>
-
-                <Grid Grid.Row="1">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto">
-                        <ListView ItemsSource="{Binding ListCheck}"
-                                  SelectedItem="{Binding Selected, Mode=OneWayToSource}"
-                                  Margin="10 0 10 10">
-                            <ListView.View>
-                                <GridView>
-                                    <GridViewColumn Header="Số giờ"
-                                                    Width="120">
-                                        <GridViewColumn.CellTemplate>
-                                            <DataTemplate>
-                                                <TextBox Text="{Binding SoGioCong, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
-                                                         Width="70"
-                                                         Height="23"/>
-                                            </DataTemplate>
-                                        </GridViewColumn.CellTemplate>
-                                    </GridViewColumn>
-                                    <GridViewColumn Header="Ghi chú"
-                                                    Width="150">
-                                        <GridViewColumn.CellTemplate>
-                                            <DataTemplate>
-                                                <TextBox Text="{Binding GhiChu, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
-                                                         Width="150"
-                                                         Height="23"/>
-                                            </DataTemplate>
-                                        </GridViewColumn.CellTemplate>
-                                    </GridViewColumn>
-                                </GridView>
-                            </ListView.View>
-                        </ListView>
-                    </ScrollViewer>
-                </Grid>
-            </Grid>
-            
-        </Grid>
+        </Border>
     </Grid>
 </Window>

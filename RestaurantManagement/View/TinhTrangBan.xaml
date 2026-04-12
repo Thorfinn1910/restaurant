@@ -8,23 +8,22 @@
              TextElement.FontFamily="Comfortaa"
              TextElement.FontSize="16"
              mc:Ignorable="d" 
-             d:DesignHeight="660" d:DesignWidth="1060">
+             d:DesignHeight="700" d:DesignWidth="1100"
+             Background="#F4F6F9">
+
     <UserControl.DataContext>
         <ViewModel:TinhTrangBanViewModel x:Name="vm"/>
     </UserControl.DataContext>
 
-    <Grid Background="White">
+    <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="3*"/>
-            <ColumnDefinition Width="2*"/>
+            <ColumnDefinition Width="5.5*"/>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="4.5*"/>
         </Grid.ColumnDefinitions>
-        <GridSplitter 
-                    Height="700" 
-                    Width="3" 
-                    Margin="0 30"/>
-        <ScrollViewer Grid.Column="0" HorizontalScrollBarVisibility="Disabled">
-            <ItemsControl x:Name="item"
-                          ItemsSource="{Binding Tables,Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+
+        <ScrollViewer Grid.Column="0" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Margin="15,20,5,20">
+            <ItemsControl x:Name="item" ItemsSource="{Binding Tables, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
                         <WrapPanel Orientation="Horizontal" HorizontalAlignment="Center"/>
@@ -32,170 +31,149 @@
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                        <Button Width="175"
-                                Height="105"
-                                Margin="5,15,15,15"
-                                FontSize="20"
+                        <Button Width="160" Height="110" Margin="10"
                                 Content="{Binding NumOfTable}"
                                 Background="{Binding Coloroftable}"
                                 Command="{Binding ElementName=vm, Path=StatusOfTableCommand}"
-                                CommandParameter="{Binding}">
-
+                                CommandParameter="{Binding}"
+                                FontSize="24" FontWeight="Bold" Foreground="White" Cursor="Hand" BorderThickness="0">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="{TemplateBinding Background}" CornerRadius="12">
+                                        <Border.Effect>
+                                            <DropShadowEffect BlurRadius="10" ShadowDepth="2" Opacity="0.15" Color="#000000"/>
+                                        </Border.Effect>
+                                        <Border BorderBrush="#20FFFFFF" BorderThickness="2" CornerRadius="12">
+                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                    </Border>
+                                </ControlTemplate>
+                            </Button.Template>
                         </Button>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
         </ScrollViewer>
 
-        <Grid Grid.Column="1">
-            <Separator 
-                        HorizontalAlignment="Left" 
-                        Height="0.8" 
-                        Margin="20 30" 
-                        Background="#46558a"/>
-            <Border Margin="20 0 20 0" CornerRadius="20" >
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="100"/>
-                        <RowDefinition Height="415"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
-                    <Border Grid.Row="0" 
-                            Padding="20" 
-                            Background="#CF0A0A" 
-                            Margin="0 20 0 0">
+        <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Center" VerticalAlignment="Stretch" 
+                      Background="#E2E8F0" Margin="5,30" ShowsPreview="True" Cursor="SizeWE"/>
+
+        <Border Grid.Column="2" Background="White" CornerRadius="15" Margin="5,20,20,20">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="20" ShadowDepth="2" Opacity="0.1" Color="#000000"/>
+            </Border.Effect>
+
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <Border Grid.Row="0" Background="#1C3879" CornerRadius="15,15,0,0" Padding="15">
+                    <TextBlock Text="{Binding TitleOfBill}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                               Foreground="White" FontWeight="Bold" FontSize="26"/>
+                </Border>
+
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
+                    <ListView ItemsSource="{Binding SelectedItems}" BorderThickness="0" Background="Transparent"
+                              HorizontalContentAlignment="Stretch" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="ListViewItem">
+                                <Setter Property="FontSize" Value="15"/>
+                                <Setter Property="Margin" Value="0,2"/>
+                                <Setter Property="Padding" Value="5"/>
+                                <Setter Property="Focusable" Value="False"/>
+                            </Style>
+                        </ListView.ItemContainerStyle>
+                        <ListView.View>
+                            <GridView>
+                                <GridViewColumn Header="Tên món" Width="210">
+                                    <GridViewColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding FoodName}" FontWeight="SemiBold" Foreground="#334155" TextWrapping="Wrap"/>
+                                        </DataTemplate>
+                                    </GridViewColumn.CellTemplate>
+                                </GridViewColumn>
+
+                                <GridViewColumn Header="Số lượng" Width="130">
+                                    <GridViewColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding Quantity}" HorizontalAlignment="Center" FontWeight="Bold" Foreground="#1C3879"/>
+                                        </DataTemplate>
+                                    </GridViewColumn.CellTemplate>
+                                </GridViewColumn>
+
+                                <GridViewColumn Header="Thành tiền">
+                                    <GridViewColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding PriceVNDCurrency}" HorizontalAlignment="Right" Foreground="#E63946" FontWeight="SemiBold"/>
+                                        </DataTemplate>
+                                    </GridViewColumn.CellTemplate>
+                                </GridViewColumn>
+                            </GridView>
+                        </ListView.View>
+                    </ListView>
+                </ScrollViewer>
+
+                <Grid Grid.Row="2" Background="#F8FAFC">
+                    <Border CornerRadius="0,0,15,15" Background="Transparent">
                         <Grid>
-                            <TextBlock HorizontalAlignment="Center"
-                                       Foreground="#fff" 
-                                       FontWeight="SemiBold" 
-                                       FontSize="35"
-                                       Text="{Binding TitleOfBill}">
-                            </TextBlock>
-                        </Grid>
-                    </Border>
-                    <ScrollViewer Grid.Row="1"
-                                  VerticalScrollBarVisibility="Auto">
-                        <ListView 
-                              ItemsSource="{Binding SelectedItems}"
-                              HorizontalAlignment="Center"
-                              HorizontalContentAlignment="Center">
-                            <ListView.ItemContainerStyle>
-                                <Style TargetType="ListViewItem">
-                                    <Setter Property="FontSize" Value="16"/>
-                                    <Setter Property="HorizontalAlignment" Value="Stretch"/>
-                                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
 
-                                </Style>
-                            </ListView.ItemContainerStyle>
-                            <ListView.View>
-                                <GridView>
-                                    <GridView.Columns>
-                                        <GridViewColumn Header="Tên món">
-                                            <GridViewColumn.CellTemplate>
-                                                <DataTemplate>
-                                                    <Border BorderBrush="Gray" BorderThickness=".5" Margin="-6,-3">
-                                                        <TextBlock Text="{Binding FoodName}" Margin="6,3"/>
-                                                    </Border>
-                                                </DataTemplate>
-                                            </GridViewColumn.CellTemplate>
-                                        </GridViewColumn>
+                            <Separator VerticalAlignment="Top" Background="#CBD5E1" Margin="0"/>
 
-                                        <GridViewColumn Header="Số lượng">
-                                            <GridViewColumn.CellTemplate>
-                                                <DataTemplate>
-                                                    <Border BorderBrush="Gray" BorderThickness=".5" Margin="-6,-3">
-                                                        <TextBlock Text="{Binding Quantity}" Margin="6,3"/>
-                                                    </Border>
-                                                </DataTemplate>
-                                            </GridViewColumn.CellTemplate>
-                                        </GridViewColumn>
-
-                                        <GridViewColumn Header="Thành tiền">
-                                            <GridViewColumn.CellTemplate>
-                                                <DataTemplate>
-                                                    <Border BorderBrush="Gray" BorderThickness=".5" Margin="-6,-3">
-                                                        <TextBlock Text="{Binding PriceVNDCurrency}" Margin="6,3"/>
-                                                    </Border>
-                                                </DataTemplate>
-                                            </GridViewColumn.CellTemplate>
-                                        </GridViewColumn>
-                                    </GridView.Columns>
-                                </GridView>
-                            </ListView.View>
-
-                        </ListView>
-                    </ScrollViewer>
-
-                    <StackPanel Grid.Row="2" Orientation="Vertical" Margin="0,15,0,0">
-                        <Separator Margin="20 10"/>
-                        <StackPanel Orientation="Horizontal"  VerticalAlignment="Top" Margin="10 10 0 0" >
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="265"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-
-                                <Label     Grid.Column="0"
-                                           Content="Tổng"
-                                           FontSize="17" 
-                                           FontWeight="SemiBold" 
-                                           Width="300" 
-                                           Margin="15,0,0,0"/>
-
-                                <Label Grid.Column="1"
-                                           Content="{Binding SumofBill}" 
-                                           FontSize="15" 
-                                           FontWeight="SemiBold" 
-                                           Foreground="#1C3879"/>
-
+                            <Grid Grid.Row="0" Margin="20,15,20,10">
+                                <TextBlock Text="TỔNG CỘNG" FontSize="18" FontWeight="Bold" Foreground="#64748B" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding SumofBill}" FontSize="28" FontWeight="Bold" Foreground="#E63946" 
+                                           HorizontalAlignment="Right" VerticalAlignment="Center"/>
                             </Grid>
 
-                        </StackPanel>
-                        <StackPanel Orientation="Horizontal"  VerticalAlignment="Top" Margin="0 5 0 0">
-                            <Button     
-                                HorizontalAlignment="Center"                               
-                                Background="Red" 
-                                BorderBrush="Yellow" 
-                                Width="150"
-                                Command="{Binding GetPaymentCommand}">
+                            <Grid Grid.Row="1" Margin="20,10,20,20">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="1*"/>
+                                    <ColumnDefinition Width="20"/>
+                                    <ColumnDefinition Width="1*"/>
+                                </Grid.ColumnDefinitions>
 
-                                <TextBlock 
-                                Foreground="White" 
-                                Text="THANH TOÁN"
-                                            />
-                            </Button>
-                            <ComboBox Margin="60,0,0,0"
-                                      ItemsSource="{Binding EmptyTables}"
-                                      SelectedItem="{Binding SelectedTable, Mode=TwoWay}"                                      
-                                      Width="150">
-                                
-                            </ComboBox>
-                            
-                        </StackPanel>
-                        <StackPanel Orientation="Horizontal"  VerticalAlignment="Top" Margin="0 0 0 0">
-                            <Button 
-                                Margin="0,5,0,0"
-                                HorizontalAlignment="Center"
-                                Width="150"
-                                Command="{Binding GetSwitchTableCommand}">
+                                <Border Grid.Column="0" Background="White" CornerRadius="8" BorderThickness="1" BorderBrush="#E2E8F0" Padding="10">
+                                    <StackPanel>
+                                        <TextBlock Text="Danh sách bàn trống" FontSize="13" Foreground="#94A3B8" Margin="0,0,0,5" FontWeight="SemiBold"/>
+                                        <ComboBox ItemsSource="{Binding EmptyTables}" SelectedItem="{Binding SelectedTable, Mode=TwoWay}" 
+                                                  Height="35" FontSize="14" Margin="0,0,0,10"/>
+                                        <Button Command="{Binding GetSwitchTableCommand}" Content="Chuyển bàn" Height="40" 
+                                                Background="#F1F5F9" Foreground="#1C3879" FontWeight="Bold" BorderThickness="0" Cursor="Hand">
+                                            <Button.Template>
+                                                <ControlTemplate TargetType="Button">
+                                                    <Border Background="{TemplateBinding Background}" CornerRadius="6">
+                                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                    </Border>
+                                                </ControlTemplate>
+                                            </Button.Template>
+                                        </Button>
+                                    </StackPanel>
+                                </Border>
 
-                                <TextBlock 
-                                Foreground="White" 
-                                Text="CHUYỂN BÀN"
-                                            />
-                            </Button>
-                            <Label 
-                                Margin="23,10"
-                                Foreground="Black" 
-                                Content="DANH SÁCH BÀN TRỐNG"
-                                            />
-                        </StackPanel>
-
-                    </StackPanel>
-
+                                <Button Grid.Column="2" Command="{Binding GetPaymentCommand}" Cursor="Hand" BorderThickness="0">
+                                    <Button.Template>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border Background="#10B981" CornerRadius="8">
+                                                <Border.Effect>
+                                                    <DropShadowEffect BlurRadius="10" ShadowDepth="2" Opacity="0.3" Color="#10B981"/>
+                                                </Border.Effect>
+                                                <TextBlock Text="Thanh toán" Foreground="White" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Border>
+                                        </ControlTemplate>
+                                    </Button.Template>
+                                </Button>
+                            </Grid>
+                        </Grid>
+                    </Border>
                 </Grid>
-            </Border>
-        </Grid>
-
+            </Grid>
+        </Border>
     </Grid>
 </UserControl>

@@ -4,7 +4,8 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes" 
-        xmlns:local="clr-namespace:RestaurantManagement.View" xmlns:fa="http://schemas.awesome.incremented/wpf/xaml/fontawesome.sharp"
+        xmlns:local="clr-namespace:RestaurantManagement.View" 
+        xmlns:fa="http://schemas.awesome.incremented/wpf/xaml/fontawesome.sharp"
         xmlns:local1="clr-namespace:RestaurantManagement.ViewModel"
         xmlns:i="http://schemas.microsoft.com/expression/2010/interactivity"
         mc:Ignorable="d"
@@ -21,89 +22,122 @@
         WindowStyle="None"
         AllowsTransparency="True"
         WindowStartupLocation="CenterScreen">
+
     <Window.DataContext>
         <local1:LoginWindowVM/>
     </Window.DataContext>
+
     <Grid>
-        <Border CornerRadius="10"
-                Background="#EEEEEE"/>
+        <Grid.Resources>
+            <Style x:Key="CloseButtonStyle" TargetType="Button">
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="Foreground" Value="#94A3B8"/>
+                <Setter Property="Width" Value="35"/>
+                <Setter Property="Height" Value="35"/>
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border Background="{TemplateBinding Background}" CornerRadius="17.5">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+                <Style.Triggers>
+                    <Trigger Property="IsMouseOver" Value="True">
+                        <Setter Property="Background" Value="#FEE2E2"/>
+                        <Setter Property="Foreground" Value="#EF4444"/>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+        </Grid.Resources>
 
-        <Button Margin="760 0 0 410"
-                Height="40"
-                Width="40"
-                Command="{Binding CloseLoginCM}"
-                CommandParameter="{Binding ElementName=loginWindow}"
-                materialDesign:ButtonAssist.CornerRadius="0,10,0,0"
-                BorderThickness="0"
-                Background="Transparent">
-            <fa:IconImage Icon="PowerOff"
-                          Height="40"
-                          Width="40"
-                          Margin="-17 -4 -15 -4"/>
-        </Button>
+        <Border Background="White" CornerRadius="15" Margin="15">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="20" ShadowDepth="3" Color="#000000" Opacity="0.25"/>
+            </Border.Effect>
 
-        <Grid>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition/>
-                <ColumnDefinition/>
-            </Grid.ColumnDefinitions>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="320"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
 
-            <!--Logo-->
+                <Border Grid.Column="0" CornerRadius="15 0 0 15">
+                    <Border.Background>
+                        <LinearGradientBrush StartPoint="0.5,0" EndPoint="0.5,1">
+                            <GradientStop Color="#1C3879" Offset="0"/>
+                            <GradientStop Color="#11224D" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Border.Background>
 
-            <Grid Grid.Column="0">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="1*"/>
-                    <RowDefinition Height="6*"/>
-                </Grid.RowDefinitions>
-                <TextBlock Grid.Row="0"
-                           VerticalAlignment="Center"
-                           HorizontalAlignment="Center"
-                           FontSize="20">
-                    QUẢN LÝ NHÀ HÀNG
-                </TextBlock>
-                <Image Grid.Row="1"
-                       Source="/images/logo.png"
-                       Margin="60 0 60 60"/>
-            </Grid>
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                        <Image Source="/images/logo.png" Width="160" Height="160" Margin="0 0 0 15" RenderOptions.BitmapScalingMode="HighQuality"/>
+                        <TextBlock Text="PHẦN MỀM" Foreground="#A2B4E2" FontSize="16" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0 0 0 2"/>
+                        <TextBlock Text="QUẢN LÝ NHÀ HÀNG" Foreground="White" FontSize="22" FontWeight="Bold" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
 
-            <!--Login form-->
+                <Grid Grid.Column="1" Background="Transparent">
 
-            <Border Background="White"
-                    Grid.Column="1"
-                    Margin="20 50 20 50"
-                    CornerRadius="10">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition/>
-                        <RowDefinition/>
-                        <RowDefinition/>
-                    </Grid.RowDefinitions>
-                    <TextBox materialDesign:HintAssist.Hint="Tên đăng nhập"
-                             Margin="35"
-                             Grid.Row="0"
-                             Text="{Binding UserName}"
-                             Style="{StaticResource MaterialDesignFloatingHintTextBox}" />
-                    <PasswordBox materialDesign:HintAssist.Hint="Mật khẩu"
-                                 x:Name="pwBox"
-                                 Grid.Row="1"
-                                 Margin="35"
-                                 Style="{StaticResource MaterialDesignFloatingHintPasswordBox}" >
-                        <i:Interaction.Triggers>
-                            <i:EventTrigger EventName="PasswordChanged">
-                                <i:InvokeCommandAction Command="{Binding PasswordChangedCommand}" 
-                                   CommandParameter="{Binding ElementName=pwBox}"/>
-                            </i:EventTrigger>
-                        </i:Interaction.Triggers>
-                    </PasswordBox>
-                    <Button Grid.Row="2"
-                            Margin="40"
-                            Command="{Binding LoginCM}"
-                            CommandParameter="{Binding ElementName=loginWindow}"
-                            Content="Đăng nhập"
-                            Background="#1C3879"/>
+                    <Button Style="{StaticResource CloseButtonStyle}" 
+                            HorizontalAlignment="Right" 
+                            VerticalAlignment="Top" 
+                            Margin="0 15 15 0"
+                            Command="{Binding CloseLoginCM}"
+                            CommandParameter="{Binding ElementName=loginWindow}">
+                        <fa:IconImage Icon="PowerOff" Width="18" Height="18" Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}"/>
+                    </Button>
+
+                    <StackPanel VerticalAlignment="Center" Margin="60 0">
+                        <TextBlock Text="ĐĂNG NHẬP" FontSize="28" FontWeight="Bold" Foreground="#1E293B" HorizontalAlignment="Center"/>
+                        <TextBlock Text="Vui lòng nhập thông tin để tiếp tục" FontSize="14" Foreground="#64748B" HorizontalAlignment="Center" Margin="0 5 0 40"/>
+
+                        <TextBox materialDesign:HintAssist.Hint="Tên đăng nhập"
+                                 Text="{Binding UserName}"
+                                 Style="{StaticResource MaterialDesignFloatingHintTextBox}" 
+                                 FontSize="16" 
+                                 Margin="0 0 0 25"/>
+
+                        <PasswordBox materialDesign:HintAssist.Hint="Mật khẩu"
+                                     x:Name="pwBox"
+                                     Style="{StaticResource MaterialDesignFloatingHintPasswordBox}" 
+                                     FontSize="16" 
+                                     Margin="0 0 0 40">
+                            <i:Interaction.Triggers>
+                                <i:EventTrigger EventName="PasswordChanged">
+                                    <i:InvokeCommandAction Command="{Binding PasswordChangedCommand}" 
+                                       CommandParameter="{Binding ElementName=pwBox}"/>
+                                </i:EventTrigger>
+                            </i:Interaction.Triggers>
+                        </PasswordBox>
+
+                        <Button Command="{Binding LoginCM}"
+                                CommandParameter="{Binding ElementName=loginWindow}"
+                                Content="ĐĂNG NHẬP"
+                                Height="45"
+                                FontSize="16"
+                                FontWeight="Bold"
+                                Background="#1C3879"
+                                BorderBrush="#1C3879"
+                                materialDesign:ButtonAssist.CornerRadius="8"
+                                Cursor="Hand">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignRaisedButton}">
+                                    <Style.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Background" Value="#2A4893"/>
+                                            <Setter Property="BorderBrush" Value="#2A4893"/>
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                    </StackPanel>
                 </Grid>
-            </Border>
-
-        </Grid>
+            </Grid>
+        </Border>
     </Grid>
 </Window>

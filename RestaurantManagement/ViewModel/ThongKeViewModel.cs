@@ -155,6 +155,8 @@ namespace QuanLyNhaHang.ViewModel
             years.Add("2022");
             years.Add("2023");
             years.Add("2024");
+            years.Add("2025");
+            years.Add("2026");
 
             Years = years;
         }
