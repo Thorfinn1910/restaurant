@@ -115,8 +115,13 @@
                         <TextBlock Text="THÔNG TIN NHẬP KHO" FontSize="18" FontWeight="Bold" Foreground="#1E293B" VerticalAlignment="Center"/>
                     </StackPanel>
 
-                    <ComboBox materialDesign:HintAssist.Hint="Lịch sử nhập gần đây"
-                              ItemsSource="{Binding ListTime}" Text="{Binding TimeSelected}" SelectedIndex="{Binding TimeIndex, Mode=TwoWay}"
+                    <TextBlock Text="{Binding CurrentStockFormModeKey}" FontSize="12" FontWeight="Bold" Foreground="#1C3879"/>
+                    <TextBlock Text="{Binding CurrentStockFormModeDescription}" FontSize="12" Foreground="#64748B" Margin="0 4 0 10"/>
+
+                    <ComboBox materialDesign:HintAssist.Hint="Phiếu nhập gần đây (chọn để sửa)"
+                              ItemsSource="{Binding ListIn}" SelectedItem="{Binding SelectedInputHistory, Mode=TwoWay}"
+                              IsEnabled="{Binding CanSelectHistory}"
+                              DisplayMemberPath="HistoryDisplay"
                               Style="{StaticResource MaterialDesignFloatingHintComboBox}" FontSize="15" Height="45"/>
                 </StackPanel>
 
@@ -150,7 +155,8 @@
                         <TextBox Grid.Row="2" Grid.Column="0" materialDesign:HintAssist.Hint="Giá nhập" Margin="0 10 0 15"
                                  Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource MaterialDesignFloatingHintTextBox}" Height="45"/>
                         <ComboBox Grid.Row="2" Grid.Column="2" materialDesign:HintAssist.Hint="Đơn vị" Margin="0 10 0 15"
-                                  Text="{Binding Unit, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource MaterialDesignFloatingHintComboBox}" Height="45">
+                                  SelectedValue="{Binding Unit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" SelectedValuePath="Content"
+                                  Style="{StaticResource MaterialDesignFloatingHintComboBox}" Height="45">
                             <ComboBoxItem>Kg</ComboBoxItem>
                             <ComboBoxItem>Chai</ComboBoxItem>
                             <ComboBoxItem>Quả</ComboBoxItem>
@@ -169,14 +175,45 @@
                     </Grid>
                 </ScrollViewer>
 
-                <Button Name="btnEditStaff" Grid.Row="2" Command="{Binding EditCM}" 
-                        Background="#10B981" Foreground="White" BorderThickness="0" Cursor="Hand" Height="50" Margin="0 10 0 0"
-                        materialDesign:ButtonAssist.CornerRadius="8">
-                    <StackPanel Orientation="Horizontal">
-                        <fa:IconImage Icon="Download" Width="18" Height="18" Foreground="White" Margin="0 0 10 0"/>
-                        <TextBlock Text="NHẬP KHO" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
-                    </StackPanel>
-                </Button>
+                <Grid Grid.Row="2" Margin="0 10 0 0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Button Grid.Column="0" Name="btnCreateIngredientMode" Command="{Binding CreateNewIngredientCM}"
+                            ToolTip="Tạo và khai báo một nguyên liệu hoàn toàn mới trong hệ thống"
+                            Background="#0EA5E9" Foreground="White" BorderThickness="0" Cursor="Hand" Height="50"
+                            materialDesign:ButtonAssist.CornerRadius="8">
+                        <StackPanel Orientation="Horizontal">
+                            <fa:IconImage Icon="BoxOpen" Width="18" Height="18" Foreground="White" Margin="0 0 10 0"/>
+                            <TextBlock Text="THÊM NGUYÊN LIỆU MỚI" FontSize="13" FontWeight="Bold" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button Grid.Column="2" Name="btnAddStockIn" Command="{Binding AddCM}"
+                            ToolTip="Lưu các thông tin trên và tạo một phiếu nhập hàng mới"
+                            Background="#1C3879" Foreground="White" BorderThickness="0" Cursor="Hand" Height="50"
+                            materialDesign:ButtonAssist.CornerRadius="8">
+                        <StackPanel Orientation="Horizontal">
+                            <fa:IconImage Icon="Plus" Width="18" Height="18" Foreground="White" Margin="0 0 10 0"/>
+                            <TextBlock Text="THÊM PHIẾU NHẬP" FontSize="13" FontWeight="Bold" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button Grid.Column="4" Name="btnEditStockIn" Command="{Binding EditCM}"
+                            ToolTip="Cập nhật những thay đổi vừa chỉnh sửa cho phiếu nhập đang chọn"
+                            Background="#10B981" Foreground="White" BorderThickness="0" Cursor="Hand" Height="50"
+                            materialDesign:ButtonAssist.CornerRadius="8">
+                        <StackPanel Orientation="Horizontal">
+                            <fa:IconImage Icon="Edit" Width="18" Height="18" Foreground="White" Margin="0 0 10 0"/>
+                            <TextBlock Text="SỬA PHIẾU ĐÃ CHỌN" FontSize="13" FontWeight="Bold" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                </Grid>
 
             </Grid>
         </Border>

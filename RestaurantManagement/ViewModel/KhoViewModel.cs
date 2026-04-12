@@ -1,352 +1,489 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Windows.Input;
-using System.Data.SqlClient;
-using System.Data;
-using System.Collections.ObjectModel;
-using QuanLyNhaHang.Models;
-using System.Windows.Forms;
-using System.IO;
-using System.Configuration;
-using iTextSharp.text.pdf;
+﻿using Document = iTextSharp.text.Document;
 using iTextSharp.text;
-using Document = iTextSharp.text.Document;
+using iTextSharp.text.pdf;
+using QuanLyNhaHang.DataProvider;
+using QuanLyNhaHang.Models;
+using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Configuration;
+using System.Data;
+using System.Data.SqlClient;
+using System.Globalization;
+using System.IO;
+using System.Windows.Forms;
+using System.Windows.Input;
 
 namespace QuanLyNhaHang.ViewModel
 {
     public class KhoViewModel : BaseViewModel
     {
-        private ObservableCollection<Kho> _ListWareHouse;
-        public ObservableCollection<Kho> ListWareHouse { get => _ListWareHouse; set { _ListWareHouse = value; OnPropertyChanged(); } }
-        private Kho _Selected;
-        public Kho Selected 
+        public enum StockFormMode
         {
-            get => _Selected; 
+            NewIngredient,
+            StockIn,
+            EditStockIn
+        }
+
+        private ObservableCollection<Kho> _listWareHouse;
+        public ObservableCollection<Kho> ListWareHouse
+        {
+            get => _listWareHouse;
             set
             {
-                _Selected = value;
-                OnPropertyChanged();
-                if (Selected != null)
-                {
-                    GetInputInfo(Selected.TenSanPham);
-                } 
+                _listWareHouse = value;
                 OnPropertyChanged();
             }
         }
-        private ObservableCollection<NhapKho> _ListIn;
-        public ObservableCollection<NhapKho> ListIn { get => _ListIn; set { _ListIn = value; OnPropertyChanged(); } }
-        private string _TimeSelected;
-        public string TimeSelected 
-        { 
-            get => _TimeSelected; 
-            set 
+
+        private Kho? _selected;
+        public Kho? Selected
+        {
+            get => _selected;
+            set
             {
-                _TimeSelected = value;
+                _selected = value;
                 OnPropertyChanged();
-                if (!String.IsNullOrEmpty(TimeSelected))
+
+                if (_selected == null)
                 {
-                    ID = ListIn[TimeIndex].MaNhap;
-                    Name = ListIn[TimeIndex].TenSP;
-                    Count = ListIn[TimeIndex].SoLuong;
-                    Unit = ListIn[TimeIndex].DonVi;
-                    Value = ListIn[TimeIndex].DonGia;
-                    DateIn = ListIn[TimeIndex].NgayNhap;
-                    Suplier = ListIn[TimeIndex].NguonNhap;
-                    SuplierInfo = ListIn[TimeIndex].LienLac;
-
-                    IDBeforeEdit = ID;
-                    NameBeforeEdit = Name;
+                    ListIn.Clear();
+                    SelectedInputHistory = null;
+                    if (CurrentStockFormMode == StockFormMode.EditStockIn)
+                    {
+                        SetFormMode(StockFormMode.StockIn);
+                    }
+                    ResetStockForm(false, true);
+                    return;
                 }
-            } 
+
+                GetInputInfo(_selected.TenSanPham);
+                if (CurrentStockFormMode == StockFormMode.NewIngredient)
+                {
+                    SetFormMode(StockFormMode.StockIn);
+                }
+                if (CurrentStockFormMode == StockFormMode.EditStockIn)
+                {
+                    SetFormMode(StockFormMode.StockIn);
+                }
+                ResetStockForm(CurrentStockFormMode != StockFormMode.NewIngredient, true);
+            }
         }
-        private int _TimeIndex;
-        public int TimeIndex { get => _TimeIndex; set { _TimeIndex = value; OnPropertyChanged(); } }
-        private ObservableCollection<string> _ListTime;
-        public ObservableCollection<string> ListTime { get => _ListTime; set { _ListTime = value; OnPropertyChanged(); } }
 
-
-        #region // Right Card
-        private string IDBeforeEdit;
-        private string _ID;
-        public string ID { get => _ID; set { _ID = value; OnPropertyChanged(); } }
-        private string NameBeforeEdit;
-        private string _Name;
-        public string Name { get => _Name; set { _Name = value; OnPropertyChanged(); } }
-        private string _Count;
-        public string Count { get => _Count; set { _Count = value; OnPropertyChanged(); } }
-        private string _Unit;
-        public string Unit { get => _Unit; set { _Unit = value; OnPropertyChanged(); } }
-        private string _Value;
-        public string Value { get => _Value; set { _Value = value; OnPropertyChanged(); } }
-        private string _DateIn;
-        public string DateIn { get => _DateIn; set { _DateIn = value; OnPropertyChanged("DateIn"); } }
-        private string _Suplier;
-        public string Suplier { get => _Suplier; set { _Suplier = value; OnPropertyChanged(); } }
-        private string _SuplierInfo;
-        public string SuplierInfo { get => _SuplierInfo; set { _SuplierInfo = value; OnPropertyChanged(); } }
-        #endregion
-
-        #region // Search bar
-        private string _Search;
-        public string Search 
-        { 
-            get => _Search; 
-            set 
-            { 
-                _Search = value;
-                string strQuery;
+        private ObservableCollection<NhapKho> _listIn;
+        public ObservableCollection<NhapKho> ListIn
+        {
+            get => _listIn;
+            set
+            {
+                _listIn = value;
                 OnPropertyChanged();
-                if (!String.IsNullOrEmpty(Search))
-                {
-                    strQuery = "SELECT * FROM KHO WHERE Xoa = 0 AND TenSanPham LIKE N'%" + Search + "%'";
-                }
-                else
-                    strQuery = "SELECT * FROM KHO WHERE Xoa = 0";
-                ListViewDisplay(strQuery);
-            } 
+            }
         }
-        #endregion
 
+        private NhapKho? _selectedInputHistory;
+        public NhapKho? SelectedInputHistory
+        {
+            get => _selectedInputHistory;
+            set
+            {
+                if (_selectedInputHistory == value)
+                {
+                    return;
+                }
 
+                _selectedInputHistory = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(CanEditHistory));
+
+                if (_selectedInputHistory != null)
+                {
+                    if (!CanSelectHistory)
+                    {
+                        return;
+                    }
+                    SetFormMode(StockFormMode.EditStockIn);
+                    FillFormFromHistory(_selectedInputHistory);
+                }
+                else if (CurrentStockFormMode == StockFormMode.EditStockIn)
+                {
+                    SetFormMode(StockFormMode.StockIn);
+                }
+            }
+        }
+
+        private StockFormMode _currentStockFormMode;
+        public StockFormMode CurrentStockFormMode
+        {
+            get => _currentStockFormMode;
+            private set
+            {
+                _currentStockFormMode = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(CurrentStockFormModeKey));
+                OnPropertyChanged(nameof(CurrentStockFormModeDescription));
+                OnPropertyChanged(nameof(IsNewIngredientMode));
+                OnPropertyChanged(nameof(CanSelectHistory));
+                OnPropertyChanged(nameof(CanEditHistory));
+            }
+        }
+
+        public string CurrentStockFormModeKey => CurrentStockFormMode switch
+        {
+            StockFormMode.NewIngredient => "NEW_INGREDIENT_MODE",
+            StockFormMode.EditStockIn => "EDIT_STOCK_IN_MODE",
+            _ => "STOCK_IN_MODE"
+        };
+
+        public string CurrentStockFormModeDescription => CurrentStockFormMode switch
+        {
+            StockFormMode.NewIngredient => "Đang tạo nguyên liệu mới. Chỉ tạo nguyên liệu chưa tồn tại.",
+            StockFormMode.EditStockIn => "Đang sửa phiếu nhập đã chọn.",
+            _ => "Đang nhập bổ sung kho. Hỗ trợ nguyên liệu mới hoặc đã có."
+        };
+
+        public bool IsNewIngredientMode => CurrentStockFormMode == StockFormMode.NewIngredient;
+        public bool CanSelectHistory => !IsNewIngredientMode;
+        public bool CanEditHistory => !IsNewIngredientMode && SelectedInputHistory != null;
+
+        private string _id;
+        public string ID { get => _id; set { _id = value; OnPropertyChanged(); } }
+
+        private string _name;
+        public string Name { get => _name; set { _name = value; OnPropertyChanged(); } }
+
+        private string _count;
+        public string Count { get => _count; set { _count = value; OnPropertyChanged(); } }
+
+        private string _unit;
+        public string Unit { get => _unit; set { _unit = value; OnPropertyChanged(); } }
+
+        private string _value;
+        public string Value { get => _value; set { _value = value; OnPropertyChanged(); } }
+
+        private string _dateIn;
+        public string DateIn { get => _dateIn; set { _dateIn = value; OnPropertyChanged(); } }
+
+        private string _suplier;
+        public string Suplier { get => _suplier; set { _suplier = value; OnPropertyChanged(); } }
+
+        private string _suplierInfo;
+        public string SuplierInfo { get => _suplierInfo; set { _suplierInfo = value; OnPropertyChanged(); } }
+
+        private string _search;
+        public string Search
+        {
+            get => _search;
+            set
+            {
+                _search = value;
+                OnPropertyChanged();
+                RefreshWarehouseList();
+            }
+        }
+
+        public ICommand CreateNewIngredientCM { get; set; }
         public ICommand AddCM { get; set; }
         public ICommand EditCM { get; set; }
         public ICommand DeleteCM { get; set; }
         public ICommand CheckCM { get; set; }
 
-
-        private string strCon = ConfigurationManager.ConnectionStrings["QuanLyNhaHang"].ConnectionString;
+        private readonly string strCon = ConfigurationManager.ConnectionStrings["QuanLyNhaHang"].ConnectionString;
         private SqlConnection sqlCon = null;
-
 
         public KhoViewModel()
         {
-            OpenConnect();
-
             ListWareHouse = new ObservableCollection<Kho>();
             ListIn = new ObservableCollection<NhapKho>();
-            ListTime = new ObservableCollection<string>();
-            DateIn = DateTime.Now.ToShortDateString();
 
-            ListViewDisplay("SELECT * FROM KHO WHERE Xoa = 0");
+            SetFormMode(StockFormMode.StockIn);
+            ResetStockForm(false, true);
+            RefreshWarehouseList();
 
+            CreateNewIngredientCM = new RelayCommand<object>((p) => true, (p) => EnterNewIngredientMode());
+            AddCM = new RelayCommand<object>((p) => CanSubmitStockIn(), (p) => AddStockInEntry());
+            EditCM = new RelayCommand<object>((p) => CanEditStockIn(), (p) => EditStockInEntry());
+            DeleteCM = new RelayCommand<object>((p) => Selected != null, (p) => DeleteWarehouseItem());
+            CheckCM = new RelayCommand<object>((p) => ListWareHouse != null, (p) => CheckLowStockAndExportPdf());
+        }
 
-            #region //add command
-            AddCM = new RelayCommand<object>((p) =>
+        private void SetFormMode(StockFormMode mode)
+        {
+            CurrentStockFormMode = mode;
+        }
+
+        private void EnterNewIngredientMode()
+        {
+            SetFormMode(StockFormMode.NewIngredient);
+            ResetStockForm(false, true);
+        }
+
+        private bool CanSubmitStockIn()
+        {
+            return !string.IsNullOrWhiteSpace(ID)
+                && !string.IsNullOrWhiteSpace(Name)
+                && !string.IsNullOrWhiteSpace(Count)
+                && !string.IsNullOrWhiteSpace(Unit)
+                && !string.IsNullOrWhiteSpace(Value)
+                && !string.IsNullOrWhiteSpace(DateIn);
+        }
+
+        private bool CanEditStockIn()
+        {
+            return CanEditHistory && CanSubmitStockIn();
+        }
+
+        private void AddStockInEntry()
+        {
+            bool isNewIngredientMode = IsNewIngredientMode;
+
+            if (!TryBuildInput(out StockInEntryInput input, out string errorMessage))
             {
-                if (string.IsNullOrEmpty(Name) || string.IsNullOrEmpty(Count) || string.IsNullOrEmpty(DateIn.ToString()) || string.IsNullOrEmpty(Unit) || string.IsNullOrEmpty(Value))
-                    return false;
-                OnPropertyChanged("ID");
+                ShowMessage(errorMessage);
+                return;
+            }
 
-                OpenConnect();
-
-                SqlCommand cmd = new SqlCommand();
-                cmd.CommandType = CommandType.Text;
-                cmd.CommandText = "SELECT MaNhap FROM CHITIETNHAP";
-                cmd.Connection = sqlCon;
-                SqlDataReader reader = cmd.ExecuteReader();
-
-                while (reader.Read())
-                {
-                    if (ID == reader.GetString(0)) return false;
-                }
-                reader.Close();
-
-                CloseConnect();
-
-                if (Count == "0") return false;
-                if (!isMoney(Value)) return false;
-                if (SuplierInfo != null && !isNumber(SuplierInfo)) return false;
-                return true;
-            }, (p) =>
+            if (KhoDP.Flag.ExistsStockInId(input.StockInId))
             {
-                OpenConnect();
+                ShowMessage("Mã nhập đã tồn tại!");
+                return;
+            }
 
-                SqlCommand cmd = new SqlCommand();
-                cmd.CommandType = CommandType.Text;
-                cmd.CommandText = "SELECT * FROM KHO WHERE TenSanPham = N'" + Name + "'";
-                cmd.Connection = sqlCon;
+            if (isNewIngredientMode && KhoDP.Flag.ExistsWarehouseProduct(input.ProductName))
+            {
+                ShowMessage("Nguyên liệu đã có trong kho, vui lòng dùng 'THÊM PHIẾU NHẬP'.");
+                return;
+            }
 
-                SqlDataReader reader = cmd.ExecuteReader();
-                if (!reader.Read())
+            try
+            {
+                KhoDP.Flag.CreateStockInEntry(input);
+                ShowMessage("Nhập thành công!");
+
+                RefreshWarehouseList();
+                GetInputInfo(input.ProductName);
+
+                if (isNewIngredientMode)
                 {
-                    reader.Close();
-                    cmd.CommandText = "INSERT INTO KHO VALUES(N'" + Name + "', " + 0 + ", N'" + Unit + "', " + Value + ", 0)";
-                    cmd.ExecuteNonQuery();
+                    SetFormMode(StockFormMode.NewIngredient);
+                    ResetStockForm(false, true);
                 }
                 else
                 {
-                    int xoa = reader.GetInt16(4);
-                    if (xoa > 0)
-                    {
-                        reader.Close();
-                        cmd.CommandText = "UPDATE KHO SET TonDu = 0, Xoa = 0 WHERE TenSanPham = N'" + Name + "'";
-                        cmd.ExecuteNonQuery();
-                    }    
-                    else
-                        reader.Close();
-                }    
-                CloseConnect();
+                    SetFormMode(StockFormMode.StockIn);
+                    ResetStockForm(true, true);
+                }
+            }
+            catch (InvalidOperationException ex)
+            {
+                ShowMessage(ex.Message);
+            }
+            catch (SqlException)
+            {
+                ShowMessage("Lỗi cơ sở dữ liệu khi nhập kho.");
+            }
+        }
 
+        private void EditStockInEntry()
+        {
+            if (SelectedInputHistory == null)
+            {
+                ShowMessage("Vui lòng chọn một phiếu nhập gần đây để sửa.");
+                return;
+            }
+
+            if (!TryBuildInput(out StockInEntryInput input, out string errorMessage))
+            {
+                ShowMessage(errorMessage);
+                return;
+            }
+
+            if (!string.Equals(input.StockInId, SelectedInputHistory.MaNhap, StringComparison.OrdinalIgnoreCase))
+            {
+                ShowMessage("Không được sửa Mã nhập!");
+                return;
+            }
+
+            if (!string.Equals(input.ProductName, SelectedInputHistory.TenSP, StringComparison.OrdinalIgnoreCase))
+            {
+                ShowMessage("Không được sửa Tên sản phẩm!");
+                return;
+            }
+
+            try
+            {
+                KhoDP.Flag.UpdateStockInEntry(SelectedInputHistory.MaNhap, input);
+                ShowMessage("Sửa thành công!");
+
+                RefreshWarehouseList();
+                GetInputInfo(input.ProductName);
+                SetFormMode(StockFormMode.StockIn);
+                ResetStockForm(true, true);
+            }
+            catch (InvalidOperationException ex)
+            {
+                ShowMessage(ex.Message);
+            }
+            catch (SqlException)
+            {
+                ShowMessage("Lỗi cơ sở dữ liệu khi sửa phiếu nhập.");
+            }
+        }
+
+        private bool TryBuildInput(out StockInEntryInput input, out string errorMessage)
+        {
+            input = new StockInEntryInput();
+            errorMessage = string.Empty;
+
+            string stockInId = (ID ?? string.Empty).Trim();
+            string productName = (Name ?? string.Empty).Trim();
+            string quantityText = (Count ?? string.Empty).Trim();
+            string unitText = (Unit ?? string.Empty).Trim();
+            string unitPriceText = (Value ?? string.Empty).Trim();
+            string dateText = (DateIn ?? string.Empty).Trim();
+            string supplierText = (Suplier ?? string.Empty).Trim();
+            string supplierContactText = (SuplierInfo ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(stockInId)
+                || string.IsNullOrWhiteSpace(productName)
+                || string.IsNullOrWhiteSpace(quantityText)
+                || string.IsNullOrWhiteSpace(unitText)
+                || string.IsNullOrWhiteSpace(unitPriceText)
+                || string.IsNullOrWhiteSpace(dateText))
+            {
+                errorMessage = "Vui lòng nhập đầy đủ thông tin bắt buộc.";
+                return false;
+            }
+
+            if (!TryParsePositiveDouble(quantityText, out double quantity))
+            {
+                errorMessage = "Số lượng phải là số lớn hơn 0.";
+                return false;
+            }
+
+            if (!TryParsePositiveDecimal(unitPriceText, out decimal unitPrice))
+            {
+                errorMessage = "Đơn giá phải là số lớn hơn 0.";
+                return false;
+            }
+
+            if (!DateTime.TryParse(dateText, CultureInfo.CurrentCulture, DateTimeStyles.None, out DateTime inputDate)
+                && !DateTime.TryParse(dateText, CultureInfo.InvariantCulture, DateTimeStyles.None, out inputDate))
+            {
+                errorMessage = "Ngày nhập không hợp lệ.";
+                return false;
+            }
+
+            if (!string.IsNullOrWhiteSpace(supplierContactText) && !isNumber(supplierContactText))
+            {
+                errorMessage = "Liên lạc chỉ được chứa chữ số.";
+                return false;
+            }
+
+            input.StockInId = stockInId;
+            input.ProductName = productName;
+            input.Quantity = quantity;
+            input.Unit = unitText;
+            input.UnitPrice = unitPrice;
+            input.DateIn = inputDate;
+            input.Supplier = supplierText;
+            input.SupplierContact = supplierContactText;
+
+            return true;
+        }
+
+        private bool TryParsePositiveDouble(string text, out double value)
+        {
+            bool parsed = double.TryParse(text, NumberStyles.Float, CultureInfo.CurrentCulture, out value)
+                || double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out value);
+
+            if (!parsed)
+            {
+                return false;
+            }
+
+            return value > 0;
+        }
+
+        private bool TryParsePositiveDecimal(string text, out decimal value)
+        {
+            bool parsed = decimal.TryParse(text, NumberStyles.Float, CultureInfo.CurrentCulture, out value)
+                || decimal.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out value);
+
+            if (!parsed)
+            {
+                return false;
+            }
+
+            return value > 0;
+        }
+
+        private void DeleteWarehouseItem()
+        {
+            Kho? selected = Selected;
+            if (selected == null)
+            {
+                return;
+            }
+
+            bool shouldDelete = false;
+
+            if (selected.TonDu > 0)
+            {
+                MyMessageBox confirmation = new MyMessageBox("Sản phẩm này đang còn trong kho!\n   Bạn có chắc chắn xóa?", true);
+                confirmation.ShowDialog();
+                if (confirmation.ACCEPT())
+                {
+                    shouldDelete = true;
+                }
+            }
+            else
+            {
+                shouldDelete = true;
+            }
+
+            if (!shouldDelete)
+            {
+                return;
+            }
+
+            try
+            {
                 OpenConnect();
 
-                SqlCommand sqlCmd = new SqlCommand();
-                sqlCmd.CommandType = CommandType.Text;
-                sqlCmd.CommandText = "INSERT INTO CHITIETNHAP VALUES ('" + ID + "',N'" + Name + "',N'" + Unit + "'," + Value + "," + Count + ",'" + DateIn + "',N'" + Suplier + "','" + SuplierInfo + "')";
-                sqlCmd.Connection = sqlCon;
+                using SqlCommand cmd = new SqlCommand("UPDATE KHO SET Xoa = 1 WHERE TenSanPham = @tenSanPham", sqlCon);
+                cmd.Parameters.AddWithValue("@tenSanPham", selected.TenSanPham);
 
-                int result = sqlCmd.ExecuteNonQuery();
+                int result = cmd.ExecuteNonQuery();
                 if (result > 0)
                 {
-                    MyMessageBox mess = new MyMessageBox("Nhập thành công!");
-                    mess.ShowDialog();
-                    GetInputInfo(Name);
+                    ShowMessage("Xóa thành công!");
+                    SetFormMode(StockFormMode.StockIn);
+                    ResetStockForm(false, true);
                 }
                 else
                 {
-                    MyMessageBox mess = new MyMessageBox("Nhập không thành công!");
-                    mess.ShowDialog();
+                    ShowMessage("Xóa không thành công!");
                 }
 
-
-                ListViewDisplay("SELECT * FROM KHO WHERE Xoa = 0");
-
-
-                CloseConnect();
-            });
-            #endregion
-
-
-            #region // edit command
-            EditCM = new RelayCommand<object>((p) =>
+                RefreshWarehouseList();
+            }
+            finally
             {
-                foreach (NhapKho item in ListIn)
-                {
-                    if (ID == item.MaNhap && Name == item.TenSP && Count == item.SoLuong && DateIn == item.NgayNhap && Value == item.DonGia && Unit == item.DonVi && Suplier == item.NguonNhap && SuplierInfo == item.LienLac)
-                        return false;
-                }
-                if (string.IsNullOrEmpty(ID) || string.IsNullOrEmpty(Name) || string.IsNullOrEmpty(Count) || string.IsNullOrEmpty(DateIn.ToString()) || string.IsNullOrEmpty(Unit) || string.IsNullOrEmpty(Value))
-                    return false;
-                if (Count == "0") return false;
-                if (!isMoney(Value)) return false;
-                if (SuplierInfo != null && !isNumber(SuplierInfo)) return false;
-                foreach(NhapKho item in ListIn)
-                {
-                    if (ID == item.MaNhap) return true;
-                }
-                return false;
-            }, (p) =>
+                CloseConnect();
+            }
+        }
+
+        private void CheckLowStockAndExportPdf()
+        {
+            try
             {
                 OpenConnect();
 
+                const string lowStockQuery = "SELECT TenSanPham, TonDu, DonVi FROM KHO WHERE Xoa = 0 AND ((DonVi = N'Kg' AND TonDu <= 1) OR (DonVi <> N'Kg' AND TonDu <= 5))";
+                using SqlCommand cmd = new SqlCommand(lowStockQuery, sqlCon);
+                using SqlDataReader reader = cmd.ExecuteReader();
 
-                if (Name != NameBeforeEdit)
-                {
-                    MyMessageBox mess = new MyMessageBox("Không được sửa Tên sản phẩm!");
-                    Name = NameBeforeEdit;
-                    mess.ShowDialog();
-                }
-                else
-                if (ID != IDBeforeEdit)
-                {
-                    MyMessageBox mess = new MyMessageBox("Không được sửa Mã nhập!");
-                    ID = IDBeforeEdit;
-                    mess.ShowDialog();
-                }
-                else
-                {
-                    SqlCommand cmd = new SqlCommand();
-                    cmd.CommandType = CommandType.Text;
-                    cmd.CommandText = "UPDATE CHITIETNHAP SET TenSanPham = N'" + Name + "', DonVi = N'" + Unit + "', DonGia = " + Value + ", SoLuong = " + Count + ", NgayNhap = '" + DateIn + "', NguonNhap = N'" + Suplier + "', LienLac = '" + SuplierInfo + "' WHERE MaNhap = '" + ID + "'";
-                    cmd.Connection = sqlCon;
-
-                    int result = cmd.ExecuteNonQuery();
-
-                    if (result > 0)
-                    {
-                        MyMessageBox mess = new MyMessageBox("Sửa thành công!");
-                        mess.ShowDialog();
-                        GetInputInfo(Name);
-                    }
-                    else
-                    {
-                        MyMessageBox mess = new MyMessageBox("Sửa không thành công!");
-                        mess.ShowDialog();
-                    }
-                    ListViewDisplay("SELECT * FROM KHO WHERE Xoa = 0");
-                }
-
-                CloseConnect();
-            });
-            #endregion
-
-
-            #region // delete command
-            DeleteCM = new RelayCommand<object>((p) =>
-            {
-                if (Selected == null) return false;
-                return true;
-            }, (p) =>
-            {
-                bool delete = false;
-
-                if (Selected.TonDu > 0)
-                {
-                    MyMessageBox yn = new MyMessageBox("Sản phẩm này đang còn trong kho!\n   Bạn có chắc chắn xóa?", true);
-                    yn.ShowDialog();
-                    if (yn.ACCEPT())
-                    {
-                        delete = true;
-                    }
-                }
-                else
-                    delete = true;
-
-                if (delete)
-                {
-                    OpenConnect();
-
-                    SqlCommand cmd = new SqlCommand();
-                    cmd.CommandType = CommandType.Text;
-                    cmd.CommandText = "UPDATE KHO SET Xoa = 1 WHERE TenSanPham = N'" + Selected.TenSanPham + "'";
-                    cmd.Connection = sqlCon;
-
-                    int result = cmd.ExecuteNonQuery();
-                    if (result > 0)
-                    {
-                        MyMessageBox mess = new MyMessageBox("Xóa thành công!");
-                        mess.ShowDialog();
-                        RefreshRightCard();
-                    }
-                    else
-                    {
-                        MyMessageBox mess = new MyMessageBox("Xóa không thành công!");
-                        mess.ShowDialog();
-                    }
-                    ListViewDisplay("SELECT * FROM KHO WHERE Xoa = 0");
-
-                    CloseConnect();
-                }    
-            });
-            #endregion
-
-
-            #region // check command
-            CheckCM = new RelayCommand<object>((p) =>
-            {
-                if (ListWareHouse == null) return false;
-                return true;
-            }, (p) =>
-            {
-                OpenConnect();
-
-                string strQuery = "SELECT * FROM KHO WHERE (DonVi = N'Kg' AND TonDu <= 1) OR (DonVi != N'Kg' AND TonDu <= 5)";
-
-                SqlCommand cmd = new SqlCommand();
-                cmd.CommandType = CommandType.Text;
-                cmd.CommandText = strQuery;
-                cmd.Connection = sqlCon;
-
-                SqlDataReader reader = cmd.ExecuteReader();
                 List<string> ten = new List<string>();
                 List<string> soluong = new List<string>();
                 List<string> donvi = new List<string>();
@@ -354,203 +491,240 @@ namespace QuanLyNhaHang.ViewModel
                 while (reader.Read())
                 {
                     ten.Add(reader.GetString(0));
-                    soluong.Add(reader.GetDouble(1).ToString());
+                    soluong.Add(Convert.ToDouble(reader[1]).ToString(CultureInfo.CurrentCulture));
                     donvi.Add(reader.GetString(2));
                 }
 
-                if (ten.Count > 0)
-                { 
-                    ListViewDisplay(strQuery);
-                    MyMessageBox yesno = new MyMessageBox("Bạn có muốn in danh sách?", true);
-                    yesno.ShowDialog();
-                    if (yesno.ACCEPT())
-                    {
-                        SaveFileDialog sfd = new SaveFileDialog();
-                        sfd.Filter = "PDF (*.pdf)|*.pdf";
-                        sfd.FileName = "Danh sách cần nhập " + DateTime.Now.Day + "-" + DateTime.Now.Month + "-" + DateTime.Now.Year;
-                        if (sfd.ShowDialog() == DialogResult.OK)
-                        {
-                            if (File.Exists(sfd.FileName))
-                            {
-                                try
-                                {
-                                    File.Delete(sfd.FileName);
-                                }
-                                catch (IOException ex)
-                                {
-                                    MyMessageBox msb = new MyMessageBox("Đã có lỗi xảy ra!");
-                                    msb.ShowDialog();
-                                }
-                            }
-                            try
-                            {
-                                PdfPTable pdfTable = new PdfPTable(3);
-                                pdfTable.DefaultCell.Padding = 3;
-                                pdfTable.WidthPercentage = 100;
-                                pdfTable.HorizontalAlignment = Element.ALIGN_LEFT;
-
-                                BaseFont bf = BaseFont.CreateFont(Environment.GetEnvironmentVariable("windir") + @"\fonts\TIMES.TTF", BaseFont.IDENTITY_H, true);
-                                Font f = new Font(bf, 16, Font.NORMAL);
-
-                                PdfPCell cell = new PdfPCell(new Phrase("Tên sản phẩm",f));
-                                pdfTable.AddCell(cell);
-                                cell = new PdfPCell(new Phrase("Tồn dư",f));
-                                pdfTable.AddCell(cell);
-                                cell = new PdfPCell(new Phrase("Đơn vị",f));
-                                pdfTable.AddCell(cell);
-                                for (int i = 0; i < ten.Count; i++)
-                                {
-                                    pdfTable.AddCell(new Phrase(ten[i],f));
-                                    pdfTable.AddCell(new Phrase(soluong[i], f));
-                                    pdfTable.AddCell(new Phrase(donvi[i], f));
-                                }    
-
-                                using (FileStream stream = new FileStream(sfd.FileName, FileMode.Create))
-                                {
-                                    Document pdfDoc = new Document(PageSize.A4, 50f, 50f, 40f, 40f);
-                                    PdfWriter.GetInstance(pdfDoc, stream);
-                                    pdfDoc.Open();
-                                    pdfDoc.Add(new Paragraph("              DANH SÁCH SẢN PHẨM CẦN NHẬP THÊM " + DateTime.Now.ToShortDateString(),f));
-                                    pdfDoc.Add(new Paragraph("    "));
-                                    pdfDoc.Add(pdfTable);
-                                    pdfDoc.Close();
-                                    stream.Close();
-                                }
-
-                                MyMessageBox mess = new MyMessageBox("In thành công!");
-                                mess.ShowDialog();
-                            }
-                            catch (Exception ex)
-                            {
-                                MyMessageBox msb = new MyMessageBox("Đã có lỗi xảy ra!");
-                                msb.ShowDialog();
-                            }
-                        }
-                        ListViewDisplay("SELECT * FROM KHO");
-                    }
-                    else
-                        ListViewDisplay("SELECT * FROM KHO");
-                }
-                else
+                if (ten.Count == 0)
                 {
-                    MyMessageBox mess = new MyMessageBox("Chưa có sản phẩm nào \n      cần nhập thêm!");
-                    mess.ShowDialog();
+                    ShowMessage("Chưa có sản phẩm nào \n      cần nhập thêm!");
+                    return;
                 }
 
-                CloseConnect();
-            });
-            #endregion
+                MyMessageBox yesno = new MyMessageBox("Bạn có muốn in danh sách?", true);
+                yesno.ShowDialog();
+                if (!yesno.ACCEPT())
+                {
+                    return;
+                }
 
-            CloseConnect();
+                SaveFileDialog sfd = new SaveFileDialog
+                {
+                    Filter = "PDF (*.pdf)|*.pdf",
+                    FileName = "Danh sách cần nhập " + DateTime.Now.Day + "-" + DateTime.Now.Month + "-" + DateTime.Now.Year
+                };
+
+                if (sfd.ShowDialog() != DialogResult.OK)
+                {
+                    return;
+                }
+
+                if (File.Exists(sfd.FileName))
+                {
+                    try
+                    {
+                        File.Delete(sfd.FileName);
+                    }
+                    catch (IOException)
+                    {
+                        ShowMessage("Đã có lỗi xảy ra!");
+                        return;
+                    }
+                }
+
+                PdfPTable pdfTable = new PdfPTable(3)
+                {
+                    WidthPercentage = 100,
+                    HorizontalAlignment = Element.ALIGN_LEFT
+                };
+                pdfTable.DefaultCell.Padding = 3;
+
+                BaseFont bf = BaseFont.CreateFont(Environment.GetEnvironmentVariable("windir") + @"\fonts\TIMES.TTF", BaseFont.IDENTITY_H, true);
+                Font f = new Font(bf, 16, Font.NORMAL);
+
+                pdfTable.AddCell(new PdfPCell(new Phrase("Tên sản phẩm", f)));
+                pdfTable.AddCell(new PdfPCell(new Phrase("Tồn dư", f)));
+                pdfTable.AddCell(new PdfPCell(new Phrase("Đơn vị", f)));
+
+                for (int i = 0; i < ten.Count; i++)
+                {
+                    pdfTable.AddCell(new Phrase(ten[i], f));
+                    pdfTable.AddCell(new Phrase(soluong[i], f));
+                    pdfTable.AddCell(new Phrase(donvi[i], f));
+                }
+
+                using FileStream stream = new FileStream(sfd.FileName, FileMode.Create);
+                Document pdfDoc = new Document(PageSize.A4, 50f, 50f, 40f, 40f);
+                PdfWriter.GetInstance(pdfDoc, stream);
+                pdfDoc.Open();
+                pdfDoc.Add(new Paragraph("              DANH SÁCH SẢN PHẨM CẦN NHẬP THÊM " + DateTime.Now.ToShortDateString(), f));
+                pdfDoc.Add(new Paragraph("    "));
+                pdfDoc.Add(pdfTable);
+                pdfDoc.Close();
+
+                ShowMessage("In thành công!");
+            }
+            catch
+            {
+                ShowMessage("Đã có lỗi xảy ra!");
+            }
+            finally
+            {
+                CloseConnect();
+            }
+        }
+
+        private void RefreshWarehouseList()
+        {
+            try
+            {
+                OpenConnect();
+
+                string keyword = (Search ?? string.Empty).Trim();
+                string query = "SELECT TenSanPham, TonDu, DonVi, DonGia FROM KHO WHERE Xoa = 0";
+
+                using SqlCommand cmd = new SqlCommand();
+                cmd.Connection = sqlCon;
+                if (!string.IsNullOrWhiteSpace(keyword))
+                {
+                    query += " AND TenSanPham LIKE @keyword";
+                    cmd.Parameters.AddWithValue("@keyword", "%" + keyword + "%");
+                }
+                cmd.CommandText = query;
+
+                using SqlDataReader reader = cmd.ExecuteReader();
+                ListWareHouse.Clear();
+
+                while (reader.Read())
+                {
+                    string ten = reader.GetString(0);
+                    float tondu = (float)Convert.ToDouble(reader[1]);
+                    string donvi = reader.GetString(2);
+                    string dongia = Convert.ToDecimal(reader[3]).ToString(CultureInfo.CurrentCulture);
+                    ListWareHouse.Add(new Kho(ten, tondu, donvi, dongia));
+                }
+            }
+            finally
+            {
+                CloseConnect();
+            }
+        }
+
+        private void GetInputInfo(string productName)
+        {
+            try
+            {
+                OpenConnect();
+
+                using SqlCommand cmd = new SqlCommand(
+                    "SELECT TOP 10 MaNhap, TenSanPham, DonVi, DonGia, SoLuong, NgayNhap, NguonNhap, LienLac " +
+                    "FROM CHITIETNHAP WHERE TenSanPham = @tenSanPham ORDER BY NgayNhap DESC, MaNhap DESC",
+                    sqlCon);
+                cmd.Parameters.AddWithValue("@tenSanPham", productName);
+
+                using SqlDataReader reader = cmd.ExecuteReader();
+                ListIn.Clear();
+                SelectedInputHistory = null;
+
+                while (reader.Read())
+                {
+                    string ma = reader.GetString(0);
+                    string ten = reader.GetString(1);
+                    string donvi = reader.GetString(2);
+                    string dongia = Convert.ToDecimal(reader[3]).ToString(CultureInfo.CurrentCulture);
+                    string soluong = Convert.ToDouble(reader[4]).ToString(CultureInfo.CurrentCulture);
+                    string date = reader.GetDateTime(5).ToShortDateString();
+                    string nguon = reader.GetString(6);
+                    string lienlac = reader.GetString(7);
+                    ListIn.Add(new NhapKho(ma, ten, donvi, dongia, soluong, date, nguon, lienlac));
+                }
+            }
+            finally
+            {
+                CloseConnect();
+            }
+        }
+
+        private void FillFormFromHistory(NhapKho inputHistory)
+        {
+            ID = inputHistory.MaNhap;
+            Name = inputHistory.TenSP;
+            Count = inputHistory.SoLuong;
+            Unit = inputHistory.DonVi;
+            Value = inputHistory.DonGia;
+            DateIn = inputHistory.NgayNhap;
+            Suplier = inputHistory.NguonNhap;
+            SuplierInfo = inputHistory.LienLac;
+        }
+
+        private void ResetStockForm(bool keepSelectedProduct, bool clearHistorySelection)
+        {
+            ID = string.Empty;
+            Count = string.Empty;
+            Unit = string.Empty;
+            Value = string.Empty;
+            Suplier = string.Empty;
+            SuplierInfo = string.Empty;
+            DateIn = DateTime.Now.ToShortDateString();
+
+            if (IsNewIngredientMode)
+            {
+                Name = string.Empty;
+            }
+            else if (keepSelectedProduct && Selected != null)
+            {
+                Name = Selected.TenSanPham;
+            }
+            else
+            {
+                Name = string.Empty;
+            }
+
+            if (clearHistorySelection)
+            {
+                SelectedInputHistory = null;
+            }
         }
 
         private void OpenConnect()
         {
-            sqlCon = new SqlConnection(strCon);
+            sqlCon ??= new SqlConnection(strCon);
             if (sqlCon.State == ConnectionState.Closed)
             {
                 sqlCon.Open();
-            }    
+            }
         }
 
         private void CloseConnect()
         {
-            if (sqlCon.State == ConnectionState.Open)
+            if (sqlCon != null && sqlCon.State == ConnectionState.Open)
             {
                 sqlCon.Close();
             }
         }
 
-        private void ListViewDisplay(string strQuery)
-        {
-            OpenConnect();
-
-            SqlCommand cmd = new SqlCommand();
-            cmd.CommandType = CommandType.Text;
-            cmd.CommandText = strQuery;
-            cmd.Connection = sqlCon;
-            SqlDataReader reader = cmd.ExecuteReader();
-            ListWareHouse.Clear();
-            while (reader.Read())
-            {
-                string ten = reader.GetString(0);
-                float tondu = (float)reader.GetDouble(1);
-                string donvi = reader.GetString(2);
-                string dongia = reader.GetSqlMoney(3).ToString();
-                ListWareHouse.Add(new Kho(ten, tondu, donvi, dongia));
-            }
-
-            CloseConnect();
-        }
-
-        private void GetInputInfo(string tensanpham)
-        {
-            OpenConnect();
-
-            SqlCommand cmd = new SqlCommand();
-            cmd.CommandType = CommandType.Text;
-            cmd.CommandText = "SELECT TOP 10 * FROM CHITIETNHAP WHERE TenSanPham = N'" + tensanpham + "' ORDER BY NgayNhap DESC";
-            cmd.Connection = sqlCon;
-            SqlDataReader reader = cmd.ExecuteReader();
-            ListIn.Clear();
-            ListTime.Clear();
-            while (reader.Read())
-            {
-                string ma = reader.GetString(0);
-                string ten = reader.GetString(1);
-                string donvi = reader.GetString(2);
-                string dongia = reader.GetSqlMoney(3).ToString();
-                string soluong = reader.GetDouble(4).ToString();
-                string date = reader.GetDateTime(5).ToShortDateString();
-                string nguon = reader.GetString(6);
-                string lienlac = reader.GetString(7);
-                ListIn.Add(new NhapKho(ma, ten, donvi, dongia, soluong, date, nguon, lienlac));
-                ListTime.Add(date);
-            }
-            if (ListTime.Count > 0)
-                TimeSelected = ListTime[0].ToString();
-            reader.Close();
-
-            CloseConnect();
-        }
-
-        private void RefreshRightCard()
-        {
-            ID = "";
-            Name = "";
-            Count = "";
-            Unit = "";
-            Value = "";
-            DateIn = "";
-            Suplier = "";
-            SuplierInfo = "";
-
-            TimeSelected = "";
-        }
-
         private bool isNumber(string s)
         {
-            if (s == null) return false;
+            if (string.IsNullOrWhiteSpace(s))
+            {
+                return false;
+            }
+
             for (int i = 0; i < s.Length; i++)
             {
-                if (s[i] < 48 || s[i] > 57) return false;
+                if (s[i] < '0' || s[i] > '9')
+                {
+                    return false;
+                }
             }
+
             return true;
         }
-        private bool isMoney(string s)
+
+        private void ShowMessage(string message)
         {
-            int count = 0;
-            for (int i = 0; i < s.Length; i++)
-            {
-                if ((s[i] < 48 || s[i] > 57) && s[i] != '.')
-                    return false;
-                if (s[i] == '.') count++;
-            }
-            if (s[0] == '.') return false;
-            if (s[s.Length - 1] == '.') return false;
-            if (s[0] == '0') return false;
-            if (count > 1) return false;
-            return true;
+            MyMessageBox mess = new MyMessageBox(message);
+            mess.ShowDialog();
         }
     }
 }

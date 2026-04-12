@@ -24,6 +24,7 @@ namespace QuanLyNhaHang.Models
         public string NguonNhap { get => _NguonNhap; set => _NguonNhap = value; }
         private string _LienLac;
         public string LienLac { get => _LienLac; set => _LienLac = value; }
+        public string HistoryDisplay => $"{MaNhap} - {NgayNhap}";
         public NhapKho(string ma, string ten, string donvi, string dongia, string soluong, string ngaynhap, string nguon, string lienlac)
         {
             MaNhap = ma;
