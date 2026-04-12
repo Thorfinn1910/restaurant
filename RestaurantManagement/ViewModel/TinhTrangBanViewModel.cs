@@ -1,36 +1,20 @@
+using iTextSharp.text;
+using iTextSharp.text.pdf;
+using QuanLyNhaHang.DataProvider;
+using QuanLyNhaHang.Models;
+using QuanLyNhaHang.Utils;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Drawing.Text;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows.Controls;
-using System.Windows.Input;
-using System.Windows.Media;
-using QuanLyNhaHang.Models;
-using QuanLyNhaHang.View;
-using RestaurantManagement.Models;
-using TinhTrangBan.Models;
-using System.Data.SqlClient;
-using System.Configuration;
-using System.Data;
-using System.Windows.Forms;
-using OfficeOpenXml.ConditionalFormatting;
-using System.Diagnostics;
-using System.Reflection.Metadata.Ecma335;
-using QuanLyNhaHang.DataProvider;
-using Org.BouncyCastle.Math;
-using iTextSharp.text.pdf;
-using iTextSharp.text;
-using Documment = iTextSharp.text.Document;
 using System.IO;
+using System.Windows.Forms;
+using System.Windows.Input;
+using TinhTrangBan.Models;
 
 namespace QuanLyNhaHang.ViewModel
 {
     public class TinhTrangBanViewModel : BaseViewModel
     {
-        string connectstring = ConfigurationManager.ConnectionStrings["QuanLyNhaHang"].ConnectionString;
         public TinhTrangBanViewModel()
         {
             StatusOfTableCommand = new RelayCommand<Table>((p) => true, (p) => GetStatusOfTable(p.ID));
@@ -40,22 +24,22 @@ namespace QuanLyNhaHang.ViewModel
             LoadTableStatus();
             LoadEmptyTables();
         }
+
         #region attributes
-        private ObservableCollection<Table> _tables = new ObservableCollection<Table>();
+        private readonly ObservableCollection<Table> _tables = new ObservableCollection<Table>();
         private ObservableCollection<SelectedMenuItems> _selectedItems = new ObservableCollection<SelectedMenuItems>();
         private ObservableCollection<string> _emptytables = new ObservableCollection<string>();
         private string titleofbill = "";
         private decimal dec_sumofbill = 0;
-        private string sumofbill = "0 VND";
+        private string sumofbill = MoneyFormatter.FormatVnd(0);
         private string selectedtable = "";
-        int IDofPaidTable = 0;
-        bool isNull = false;
+        private int IDofPaidTable = 0;
         #endregion
 
         #region properties
-        public ObservableCollection<Table> Tables { get { return _tables; } set { _tables = value; OnPropertyChanged(); } }
+        public ObservableCollection<Table> Tables { get { return _tables; } set { OnPropertyChanged(); } }
         public ObservableCollection<SelectedMenuItems> SelectedItems { get { return _selectedItems; } set { _selectedItems = value; } }
-        public ObservableCollection<string> EmptyTables { get { return _emptytables; } set { _emptytables = value; } }
+        public ObservableCollection<string> EmptyTables { get { return _emptytables; } set { _emptytables = value; OnPropertyChanged(); } }
         public string TitleOfBill
         {
             get { return titleofbill; }
@@ -77,6 +61,7 @@ namespace QuanLyNhaHang.ViewModel
             set { selectedtable = value; OnPropertyChanged(); }
         }
         #endregion
+
         #region commands
         public ICommand StatusOfTableCommand { get; set; }
         public ICommand GetPaymentCommand { get; set; }
@@ -86,60 +71,24 @@ namespace QuanLyNhaHang.ViewModel
         #region methods
         public void LoadTables()
         {
-            _tables.Add(new Table { NumOfTable = "Bàn 1", ID = 1 });
-            _tables.Add(new Table { NumOfTable = "Bàn 2", ID = 2 });
-            _tables.Add(new Table { NumOfTable = "Bàn 3", ID = 3 });
-            _tables.Add(new Table { NumOfTable = "Bàn 4", ID = 4 });
-            _tables.Add(new Table { NumOfTable = "Bàn 5", ID = 5 });
-            _tables.Add(new Table { NumOfTable = "Bàn 6", ID = 6 });
-            _tables.Add(new Table { NumOfTable = "Bàn 7", ID = 7 });
-            _tables.Add(new Table { NumOfTable = "Bàn 8", ID = 8 });
-            _tables.Add(new Table { NumOfTable = "Bàn 9", ID = 9 });
-            _tables.Add(new Table { NumOfTable = "Bàn 10", ID = 10 });
-            _tables.Add(new Table { NumOfTable = "Bàn 11", ID = 11 });
-            _tables.Add(new Table { NumOfTable = "Bàn 12", ID = 12 });
-            _tables.Add(new Table { NumOfTable = "Bàn 13", ID = 13 });
-            _tables.Add(new Table { NumOfTable = "Bàn 14", ID = 14 });
-            _tables.Add(new Table { NumOfTable = "Bàn 15", ID = 15 });
-
-            Tables = _tables;
-        }
-        public void LoadEmptyTables()
-        {
-            string numoftable;
-            using (SqlConnection con = new SqlConnection(connectstring))
+            _tables.Clear();
+            for (int tableId = 1; tableId <= 15; tableId++)
             {
-                con.Open();
-                SqlCommand cmd = new SqlCommand();
-                cmd.Connection = con;
-                cmd.CommandType = CommandType.Text;
-
-                cmd.CommandText = "Select SoBan from BAN where TrangThai = N'Có thể sử dụng'";                
-                SqlDataReader reader = cmd.ExecuteReader();
-                while (reader.Read())
-                {
-                    try
-                    {
-                        numoftable = reader.GetInt16(0).ToString();
-                        _emptytables.Add(numoftable);
-
-                        EmptyTables = _emptytables;
-                    }
-                    catch
-                    {
-                        numoftable = "";                       
-                    }
-                }
-                con.Close();
+                _tables.Add(new Table { NumOfTable = "B\u00e0n " + tableId, ID = tableId });
             }
         }
+
+        public void LoadEmptyTables()
+        {
+            EmptyTables = TinhTrangBanDP.Flag.GetEmptyTables();
+        }
+
         public void LoadTableStatus()
         {
-            string tablestatus;
             foreach (Table table in _tables)
             {
-                tablestatus = TinhTrangBanDP.Flag.LoadEachTableStatus(table.ID);
-                if (tablestatus == "Có thể sử dụng")
+                string tableStatus = TinhTrangBanDP.Flag.LoadEachTableStatus(table.ID);
+                if (TinhTrangBanDP.Flag.IsTableAvailableStatus(tableStatus))
                 {
                     table.Status = 0;
                     table.Coloroftable = "Green";
@@ -150,51 +99,28 @@ namespace QuanLyNhaHang.ViewModel
                     table.Coloroftable = "Red";
                 }
             }
-        }                      
-        public void DisplayBill(int BillID)
+        }
+
+        public void DisplayBill(int billID)
         {
             SelectedItems.Clear();
             Dec_sumofbill = 0;
-            string FoodName;
-            decimal Price;
-            int Quantity;
-            using (SqlConnection con = new SqlConnection(connectstring))
+            SumofBill = MoneyFormatter.FormatVnd(Dec_sumofbill);
+            if (billID <= 0)
             {
-                con.Open();
-                SqlCommand cmd = new SqlCommand();
-                cmd.Connection = con;
-                cmd.CommandType = CommandType.Text;
-
-                cmd.CommandText = "Select TenMon, SoLuong, Gia * SoLuong " +
-                    "from CTHD inner join MENU on CTHD.MaMon = MENU.MaMon " +
-                    "where CTHD.SoHD = @SOHD";
-                cmd.Parameters.AddWithValue("@SOHD", BillID);
-
-                SqlDataReader reader = cmd.ExecuteReader();
-                while (reader.Read())
-                {
-                    try
-                    {
-                        FoodName = reader.GetString(0);
-                        Quantity = reader.GetInt16(1);
-                        Price = reader.GetDecimal(2);
-                        SelectedMenuItems selected = new SelectedMenuItems(FoodName, Price, Quantity);
-                        SelectedItems.Add(selected);
-
-                        Dec_sumofbill += Price;
-                        SumofBill = String.Format("{0:0,0 VND}", Dec_sumofbill);
-                    }
-                    catch
-                    {
-                        FoodName = "";
-                        Quantity = 0;
-                        Price = 0;
-                    }
-                }
-                con.Close();
+                return;
             }
 
+            List<TinhTrangBanDP.BillItemRow> billItems = TinhTrangBanDP.Flag.GetBillItems(billID);
+            foreach (TinhTrangBanDP.BillItemRow item in billItems)
+            {
+                SelectedItems.Add(new SelectedMenuItems(item.TenMon, item.ThanhTien, item.SoLuong));
+                Dec_sumofbill += item.ThanhTien;
+            }
+
+            SumofBill = MoneyFormatter.FormatVnd(Dec_sumofbill);
         }
+
         public void GetStatusOfTable(int ID)
         {
             foreach (Table table in _tables)
@@ -205,7 +131,6 @@ namespace QuanLyNhaHang.ViewModel
                     {
                         table.Coloroftable = "Green";
                         table.Status = 0;
-                        
                     }
                     else
                     {
@@ -218,195 +143,199 @@ namespace QuanLyNhaHang.ViewModel
                 }
             }
         }
-        public void PrintBill(int BillID, int TableID)
+
+        public void PrintBill(int billID, int tableID)
         {
-            using (SqlConnection con = new SqlConnection(connectstring))
+            List<TinhTrangBanDP.BillItemRow> billItems = TinhTrangBanDP.Flag.GetBillItems(billID);
+            if (billItems.Count == 0)
             {
-                con.Open();
-                string strQuery = "Select TenMon, SoLuong, Gia * SoLuong " +
-                    "from CTHD inner join MENU on CTHD.MaMon = MENU.MaMon " +
-                    "where CTHD.SoHD = " + BillID;
+                MyMessageBox mess = new MyMessageBox("Kh\u00f4ng t\u1ed3n t\u1ea1i h\u00f3a \u0111\u01a1n!");
+                mess.ShowDialog();
+                return;
+            }
 
-                SqlCommand cmd = new SqlCommand();
-                cmd.Connection = con;
-                cmd.CommandType = CommandType.Text;
-                cmd.CommandText = strQuery;
+            DisplayBill(billID);
+            MyMessageBox yesno = new MyMessageBox("B\u1ea1n c\u00f3 mu\u1ed1n in h\u00f3a \u0111\u01a1n?", true);
+            yesno.ShowDialog();
+            if (!yesno.ACCEPT())
+            {
+                return;
+            }
 
-                SqlDataReader reader = cmd.ExecuteReader();
-                List<string> ten = new List<string>();
-                List<string> soluong = new List<string>();
-                List<string> gia = new List<string>();
+            SaveFileDialog sfd = new SaveFileDialog();
+            sfd.Filter = "PDF (*.pdf)|*.pdf";
+            sfd.FileName = "Ma hoa don " + billID + " ngay " + DateTime.Now.Day + "-" + DateTime.Now.Month + "-" + DateTime.Now.Year;
+            if (sfd.ShowDialog() != DialogResult.OK)
+            {
+                return;
+            }
 
-                while (reader.Read())
+            if (File.Exists(sfd.FileName))
+            {
+                try
                 {
-                    ten.Add(reader.GetString(0));
-                    soluong.Add(reader.GetInt16(1).ToString());
-                    gia.Add(reader.GetDecimal(2).ToString());
+                    File.Delete(sfd.FileName);
                 }
-
-                if (ten.Count > 0)
+                catch (IOException)
                 {
-                    DisplayBill(BillID);
-                    MyMessageBox yesno = new MyMessageBox("Bạn có muốn in hóa đơn?", true);
-                    yesno.ShowDialog();
-                    if (yesno.ACCEPT())
-                    {
-                        SaveFileDialog sfd = new SaveFileDialog();
-                        sfd.Filter = "PDF (*.pdf)|*.pdf";
-                        sfd.FileName = "Mã hóa đơn " + BillID.ToString() + " ngày " + DateTime.Now.Day + "-" + DateTime.Now.Month + "-" + DateTime.Now.Year;
-                        if (sfd.ShowDialog() == DialogResult.OK)
-                        {
-                            if (File.Exists(sfd.FileName))
-                            {
-                                try
-                                {
-                                    File.Delete(sfd.FileName);
-                                }
-                                catch (IOException ex)
-                                {
-                                    MyMessageBox msb = new MyMessageBox("Đã có lỗi xảy ra!");
-                                    msb.ShowDialog();
-                                }
-                            }
-                            try
-                            {
-                                PdfPTable pdfTable = new PdfPTable(3);
-                                pdfTable.DefaultCell.Padding = 3;
-                                pdfTable.WidthPercentage = 100;
-                                pdfTable.HorizontalAlignment = Element.ALIGN_MIDDLE;
-
-                                BaseFont bf = BaseFont.CreateFont(Environment.GetEnvironmentVariable("windir") + @"\fonts\TIMES.TTF", BaseFont.IDENTITY_H, true);
-                                Font f = new Font(bf, 16, Font.NORMAL);
-
-                                PdfPCell cell = new PdfPCell(new Phrase("Tên món", f));
-                                pdfTable.AddCell(cell);
-                                cell = new PdfPCell(new Phrase("Số lượng", f));
-                                pdfTable.AddCell(cell);
-                                cell = new PdfPCell(new Phrase("Giá", f));
-                                pdfTable.AddCell(cell);
-                                for (int i = 0; i < ten.Count; i++)
-                                {
-                                    pdfTable.AddCell(new Phrase(ten[i], f));
-                                    pdfTable.AddCell(new Phrase(soluong[i], f));
-                                    pdfTable.AddCell(new Phrase(gia[i], f));
-                                }
-
-                                using (FileStream stream = new FileStream(sfd.FileName, FileMode.Create))
-                                {
-                                    Document pdfDoc = new Document(PageSize.A4, 50f, 50f, 40f, 40f);
-                                    PdfWriter.GetInstance(pdfDoc, stream);
-                                    pdfDoc.Open();
-                                    pdfDoc.Add(new Paragraph("                                                 HÓA ĐƠN ", f));
-                                    pdfDoc.Add(new Paragraph("    "));
-                                    pdfDoc.Add(new Paragraph("Số bàn: " + TableID.ToString() + "                                                                    Mã hóa đơn: " + BillID.ToString(), f));
-                                    pdfDoc.Add(new Paragraph("Thời gian: " + DateTime.Now.Day.ToString() + "/" + DateTime.Now.Month.ToString() + "/" + DateTime.Now.Year.ToString() + " " + DateTime.Now.TimeOfDay.ToString(), f));
-                                    pdfDoc.Add(new Paragraph("    "));
-                                    pdfDoc.Add(pdfTable);
-                                    pdfDoc.Add(new Paragraph("Tổng cộng:                                                                    " + SumofBill, f));
-                                    pdfDoc.Add(new Paragraph("    "));
-                                    pdfDoc.Add(new Paragraph("                                      HẸN GẶP LẠI QUÝ KHÁCH", f));
-                                    pdfDoc.Close();
-                                    stream.Close();
-                                }
-
-                                MyMessageBox mess = new MyMessageBox("In thành công!");
-                                mess.ShowDialog();
-                            }
-                            catch (Exception ex)
-                            {
-                                MyMessageBox msb = new MyMessageBox("Đã có lỗi xảy ra!");
-                                msb.ShowDialog();
-                            }
-                        }
-                    }
-                    else
-                    {
-                        DisplayBill(BillID);
-                    }
-                }
-                else
-                {
-                    MyMessageBox mess = new MyMessageBox("Không tồn tại hóa đơn!");
-                    mess.ShowDialog();
+                    MyMessageBox msb = new MyMessageBox("\u0110\u00e3 c\u00f3 l\u1ed7i x\u1ea3y ra!");
+                    msb.ShowDialog();
+                    return;
                 }
             }
+
+            try
+            {
+                PdfPTable pdfTable = new PdfPTable(3);
+                pdfTable.DefaultCell.Padding = 3;
+                pdfTable.WidthPercentage = 100;
+                pdfTable.HorizontalAlignment = Element.ALIGN_MIDDLE;
+
+                BaseFont bf = BaseFont.CreateFont(Environment.GetEnvironmentVariable("windir") + @"\fonts\TIMES.TTF", BaseFont.IDENTITY_H, true);
+                Font f = new Font(bf, 16, Font.NORMAL);
+
+                pdfTable.AddCell(new PdfPCell(new Phrase("T\u00ean m\u00f3n", f)));
+                pdfTable.AddCell(new PdfPCell(new Phrase("S\u1ed1 l\u01b0\u1ee3ng", f)));
+                pdfTable.AddCell(new PdfPCell(new Phrase("Gi\u00e1", f)));
+                foreach (TinhTrangBanDP.BillItemRow item in billItems)
+                {
+                    pdfTable.AddCell(new Phrase(item.TenMon, f));
+                    pdfTable.AddCell(new Phrase(item.SoLuong.ToString(), f));
+                    pdfTable.AddCell(new Phrase(MoneyFormatter.FormatVnd(item.ThanhTien), f));
+                }
+
+                using (FileStream stream = new FileStream(sfd.FileName, FileMode.Create))
+                {
+                    Document pdfDoc = new Document(PageSize.A4, 50f, 50f, 40f, 40f);
+                    PdfWriter.GetInstance(pdfDoc, stream);
+                    pdfDoc.Open();
+                    pdfDoc.Add(new Paragraph("                                                 HOA DON ", f));
+                    pdfDoc.Add(new Paragraph("    "));
+                    pdfDoc.Add(new Paragraph("So ban: " + tableID + "                                                                    Ma hoa don: " + billID, f));
+                    pdfDoc.Add(new Paragraph("Thoi gian: " + DateTime.Now.Day + "/" + DateTime.Now.Month + "/" + DateTime.Now.Year + " " + DateTime.Now.TimeOfDay, f));
+                    pdfDoc.Add(new Paragraph("    "));
+                    pdfDoc.Add(pdfTable);
+                    pdfDoc.Add(new Paragraph("Tong cong:                                                                    " + SumofBill, f));
+                    pdfDoc.Add(new Paragraph("    "));
+                    pdfDoc.Add(new Paragraph("                                      HEN GAP LAI QUY KHACH", f));
+                    pdfDoc.Close();
+                }
+
+                MyMessageBox mess = new MyMessageBox("In thanh cong!");
+                mess.ShowDialog();
+            }
+            catch
+            {
+                MyMessageBox msb = new MyMessageBox("\u0110\u00e3 c\u00f3 l\u1ed7i x\u1ea3y ra!");
+                msb.ShowDialog();
+            }
         }
+
         public void Payment()
         {
-            foreach (Table table in _tables)
-            {
-                if (table.ID == IDofPaidTable)
-                {
-                    table.Coloroftable = "Green";
-                    table.Status = 0;
-                    TinhTrangBanDP.Flag.UpdateTable(table.ID, true);
-                    TinhTrangBanDP.Flag.UpdateBillStatus(table.Bill_ID);
-
-                    PrintBill(table.Bill_ID, table.ID);
-                    Dec_sumofbill = 0;
-                    SumofBill = String.Format("{0:0,0 VND}", Dec_sumofbill);
-                    SelectedItems.Clear();
-                    TitleOfBill = "";
-                    MyMessageBox msb = new MyMessageBox("Đã thanh toán thành công!");
-                    msb.Show();
-                    break;
-                }
-            }
-        }
-        public void SwitchTable()
-        {
-            foreach(Table table in _tables)
-            {
-                if (table.ID == IDofPaidTable)
-                {
-                    if (SelectedTable == "")
-                    {
-                        MyMessageBox msb = new MyMessageBox("Vui lòng chọn bàn để chuyển đến trong danh sách bàn trống!");
-                        msb.Show();
-                        isNull = true;
-                        break;
-                    }
-                    else
-                    {
-                        table.Coloroftable = "Green";
-                        table.Status = 0;
-                        TinhTrangBanDP.Flag.UpdateTable(table.ID, true);
-                        TinhTrangBanDP.Flag.SwitchTable(int.Parse(SelectedTable), table.Bill_ID);
-                        TinhTrangBanDP.Flag.UpdateTable(int.Parse(SelectedTable), false);
-
-                        Dec_sumofbill = 0;
-                        SumofBill = String.Format("{0:0,0 VND}", Dec_sumofbill);
-                        SelectedItems.Clear();
-                        TitleOfBill = "";
-                        MyMessageBox msb = new MyMessageBox("Đã chuyển bàn thành công!");
-                        msb.Show();
-                        break;
-                    }                       
-                }
-            }
             if (IDofPaidTable == 0)
             {
-                MyMessageBox msb = new MyMessageBox("Vui lòng ấn chọn 1 bàn cần chuyển trước khi nhấn nút Chuyển bàn!");
+                MyMessageBox msb = new MyMessageBox("Vui long chon ban can thanh toan!");
                 msb.Show();
-                isNull = true;
+                return;
             }
+
             foreach (Table table in _tables)
             {
-                if (isNull)
+                if (table.ID != IDofPaidTable)
                 {
-                    break;
+                    continue;
                 }
-                else if (table.ID == int.Parse(SelectedTable))
+
+                try
                 {
-                    table.Coloroftable = "Red";
-                    table.Status = 1;
+                    if (table.Bill_ID <= 0)
+                    {
+                        table.Bill_ID = TinhTrangBanDP.Flag.LoadBill(table.ID);
+                    }
+
+                    TinhTrangBanDP.Flag.PayBillTransactional(table.ID, table.Bill_ID);
+                    table.Coloroftable = "Green";
+                    table.Status = 0;
+                    PrintBill(table.Bill_ID, table.ID);
+                    ResetSelectionState();
+                    LoadTableStatus();
+                    LoadEmptyTables();
+                    MyMessageBox msb = new MyMessageBox("Da thanh toan thanh cong!");
+                    msb.Show();
                 }
+                catch (Exception ex)
+                {
+                    MyMessageBox msb = new MyMessageBox(ex.Message);
+                    msb.Show();
+                }
+                break;
             }
-            EmptyTables.Clear();
-            LoadEmptyTables();
         }
 
-        #endregion
+        public void SwitchTable()
+        {
+            if (IDofPaidTable == 0)
+            {
+                MyMessageBox msb = new MyMessageBox("Vui long chon 1 ban can chuyen truoc!");
+                msb.Show();
+                return;
+            }
 
+            if (string.IsNullOrWhiteSpace(SelectedTable))
+            {
+                MyMessageBox msb = new MyMessageBox("Vui long chon ban de chuyen den trong danh sach ban trong!");
+                msb.Show();
+                return;
+            }
+
+            if (!int.TryParse(SelectedTable, out int targetTableId))
+            {
+                MyMessageBox msb = new MyMessageBox("Ban chuyen den khong hop le!");
+                msb.Show();
+                return;
+            }
+
+            foreach (Table table in _tables)
+            {
+                if (table.ID != IDofPaidTable)
+                {
+                    continue;
+                }
+
+                try
+                {
+                    if (table.Bill_ID <= 0)
+                    {
+                        table.Bill_ID = TinhTrangBanDP.Flag.LoadBill(table.ID);
+                    }
+
+                    TinhTrangBanDP.Flag.SwitchTableTransactional(table.ID, targetTableId, table.Bill_ID);
+                    table.Coloroftable = "Green";
+                    table.Status = 0;
+                    ResetSelectionState();
+                    LoadTableStatus();
+                    LoadEmptyTables();
+                    MyMessageBox msb = new MyMessageBox("Da chuyen ban thanh cong!");
+                    msb.Show();
+                }
+                catch (Exception ex)
+                {
+                    MyMessageBox msb = new MyMessageBox(ex.Message);
+                    msb.Show();
+                }
+                break;
+            }
+        }
+
+        private void ResetSelectionState()
+        {
+            Dec_sumofbill = 0;
+            SumofBill = MoneyFormatter.FormatVnd(Dec_sumofbill);
+            SelectedItems.Clear();
+            TitleOfBill = "";
+            IDofPaidTable = 0;
+        }
+        #endregion
     }
 }

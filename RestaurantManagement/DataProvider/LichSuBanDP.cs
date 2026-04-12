@@ -1,4 +1,5 @@
 using LichSuBan.Models;
+using QuanLyNhaHang.Utils;
 using System;
 using System.Collections.ObjectModel;
 using System.Data.SqlClient;
@@ -90,7 +91,7 @@ namespace QuanLyNhaHang.DataProvider
                     int soLuong = Convert.ToInt32(reader.GetValue(3));
                     decimal gia = reader.GetDecimal(4);
                     string ngayHd = reader.GetDateTime(5).ToShortDateString();
-                    string triGia = (gia * soLuong).ToString();
+                    string triGia = MoneyFormatter.FormatVnd(gia * soLuong);
                     result.Add(new LichSuBanModel(soHd, maMon, tenMon, soLuong, triGia, ngayHd));
                 }
             }

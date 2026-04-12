@@ -1,4 +1,5 @@
-﻿using QuanLyNhaHang.ViewModel;
+using QuanLyNhaHang.ViewModel;
+using QuanLyNhaHang.Utils;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -110,7 +111,7 @@ namespace TinhTrangBan.Models
 
         public string PriceVNDCurrency
         {
-            get { return String.Format("{0:0,0 VND}", Price); }
+            get { return MoneyFormatter.FormatVnd(Price); }
         }
         public int Quantity
         {
@@ -128,3 +129,4 @@ namespace TinhTrangBan.Models
     }
     
 }
+

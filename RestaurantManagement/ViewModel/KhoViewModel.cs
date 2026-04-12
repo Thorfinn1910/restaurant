@@ -3,6 +3,7 @@ using iTextSharp.text;
 using iTextSharp.text.pdf;
 using QuanLyNhaHang.DataProvider;
 using QuanLyNhaHang.Models;
+using QuanLyNhaHang.Utils;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -600,7 +601,7 @@ namespace QuanLyNhaHang.ViewModel
                     string ten = reader.GetString(0);
                     float tondu = (float)Convert.ToDouble(reader[1]);
                     string donvi = reader.GetString(2);
-                    string dongia = Convert.ToDecimal(reader[3]).ToString(CultureInfo.CurrentCulture);
+                    string dongia = MoneyFormatter.FormatVnd(Convert.ToDecimal(reader[3]));
                     ListWareHouse.Add(new Kho(ten, tondu, donvi, dongia));
                 }
             }
@@ -631,7 +632,7 @@ namespace QuanLyNhaHang.ViewModel
                     string ma = reader.GetString(0);
                     string ten = reader.GetString(1);
                     string donvi = reader.GetString(2);
-                    string dongia = Convert.ToDecimal(reader[3]).ToString(CultureInfo.CurrentCulture);
+                    string dongia = MoneyFormatter.FormatPlainAmount(Convert.ToDecimal(reader[3]));
                     string soluong = Convert.ToDouble(reader[4]).ToString(CultureInfo.CurrentCulture);
                     string date = reader.GetDateTime(5).ToShortDateString();
                     string nguon = reader.GetString(6);

@@ -8,6 +8,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Media.Imaging;
 using QuanLyNhaHang.Models;
+using QuanLyNhaHang.Utils;
 using TinhTrangBan.Models;
 
 namespace QuanLyNhaHang.DataProvider
@@ -509,7 +510,7 @@ namespace QuanLyNhaHang.DataProvider
                     string tensp = dr["TenSanPham"].ToString();
                     float tondu = (float)Convert.ToDouble(dr["TonDu"]);
                     string donvi = dr["DonVi"].ToString();
-                    string dongia = dr["DonGia"].ToString();
+                    string dongia = MoneyFormatter.FormatVnd(Convert.ToDecimal(dr["DonGia"]));
                     NLs.Add(new Kho(tensp, tondu, donvi, dongia));
                 }
             }

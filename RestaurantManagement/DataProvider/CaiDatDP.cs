@@ -26,14 +26,47 @@ namespace QuanLyNhaHang.DataProvider
         }
         public NhanVien GetCurrentEmployee(string MaNV, string pw)
         {
-            NhanVien nv = null;
-            DataTable dt = new DataTable();
-            dt = LoadInitialData("Select * from NhanVien where MaNV = '" + MaNV + "'");
-            foreach(DataRow dr in dt.Rows)
+            NhanVien? nv = null;
+            try
             {
-                nv = new NhanVien(dr["MaNV"].ToString(), dr["TenNV"].ToString(), dr["ChucVu"].ToString(), dr["DiaChi"].ToString(), (bool)dr["FullTime"], dr["SDT"].ToString(), Convert.ToDateTime(dr["NgayVaoLam"]).ToShortDateString(), Convert.ToDateTime(dr["NgaySinh"]).ToShortDateString());
+                DBOpen();
+                using SqlCommand cmd = new SqlCommand(
+                    "SELECT n.MaNV, n.TenNV, n.ChucVu, n.DiaChi, n.FullTime, n.SDT, n.NgayVaoLam, n.NgaySinh, " +
+                    "       ISNULL(t.ID, '') AS AccountID, ISNULL(t.MatKhau, '') AS AccountPassword " +
+                    "FROM NHANVIEN n " +
+                    "LEFT JOIN TAIKHOAN t ON t.MaNV = n.MaNV " +
+                    "WHERE n.MaNV = @maNV",
+                    SqlCon);
+                cmd.Parameters.AddWithValue("@maNV", MaNV);
+                using SqlDataReader reader = cmd.ExecuteReader();
+                if (reader.Read())
+                {
+                    string accountId = reader.GetString(8);
+                    string accountPassword = reader.GetString(9);
+                    string finalPassword = string.IsNullOrWhiteSpace(pw) ? accountPassword : pw;
+                    nv = new NhanVien(
+                        reader.GetString(0),
+                        reader.GetString(1),
+                        reader.GetString(2),
+                        reader.GetString(3),
+                        reader.GetBoolean(4),
+                        reader.GetString(5),
+                        reader.GetDateTime(6).ToShortDateString(),
+                        reader.GetDateTime(7).ToShortDateString(),
+                        accountId,
+                        finalPassword);
+                }
             }
-            nv.MatKhau = pw;
+            finally
+            {
+                DBClose();
+            }
+
+            if (nv == null)
+            {
+                throw new InvalidOperationException("Không tìm thấy nhân viên.");
+            }
+
             return nv;
         }
         public void ChangePassword(string pw, string ID)
@@ -120,16 +153,33 @@ namespace QuanLyNhaHang.DataProvider
             }
         }
         #region complementary methods
+        public string GetAccountIdByEmployee(string maNV)
+        {
+            if (string.IsNullOrWhiteSpace(maNV))
+            {
+                return string.Empty;
+            }
+
+            try
+            {
+                DBOpen();
+                using SqlCommand cmd = new SqlCommand(
+                    "SELECT TOP (1) ID FROM TaiKhoan WHERE MaNV = @maNV",
+                    SqlCon);
+                cmd.Parameters.AddWithValue("@maNV", maNV);
+                object? value = cmd.ExecuteScalar();
+                return value == null || value == DBNull.Value ? string.Empty : value.ToString() ?? string.Empty;
+            }
+            finally
+            {
+                DBClose();
+            }
+        }
+
+        [Obsolete("Use GetAccountIdByEmployee(maNV) instead.")]
         public string getAccountIDFromTaiKhoan()
         {
-            string ID = "";
-            DataTable dt = new DataTable();
-            dt = LoadInitialData("Select * from TaiKhoan");
-            foreach (DataRow dr in dt.Rows)
-            {
-                ID = dr["Id"].ToString();
-            }
-            return ID;
+            return string.Empty;
         }
         #endregion
     }

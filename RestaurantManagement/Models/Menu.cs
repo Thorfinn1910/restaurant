@@ -1,4 +1,5 @@
-﻿using QuanLyNhaHang.ViewModel;
+using QuanLyNhaHang.ViewModel;
+using QuanLyNhaHang.Utils;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -61,13 +62,13 @@ namespace QuanLyNhaHang.Models
 
         public string PriceVNDCurrency
         {
-            get { return String.Format("{0:0,0 VND}", Price); }
+            get { return MoneyFormatter.FormatVnd(Price); }
         }
         public string Str_Price
         {
             get
             {
-                return Price.ToString();
+                return MoneyFormatter.FormatPlainAmount(Price);
             }
             set
             {
@@ -205,7 +206,7 @@ namespace QuanLyNhaHang.Models
 
         public string PriceVNDCurrency
         {
-            get { return String.Format("{0:0,0 VND}", Price); }
+            get { return MoneyFormatter.FormatVnd(Price); }
         }
         public int Quantity
         {
@@ -248,3 +249,4 @@ namespace QuanLyNhaHang.Models
         #endregion
     }
 }
+

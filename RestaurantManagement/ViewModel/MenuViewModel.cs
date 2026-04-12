@@ -17,6 +17,7 @@ using QuanLyNhaHang.View;
 using QuanLyNhaHang.DataProvider;
 using QuanLyNhaHang.ViewModel;
 using QuanLyNhaHang.State.Navigator;
+using QuanLyNhaHang.Utils;
 using System.Windows.Data;
 using System.ComponentModel;
 using TinhTrangBan.Models;
@@ -53,7 +54,7 @@ namespace QuanLyNhaHang.ViewModel
                 }
                 SelectedItems.Clear();
                 DecSubtotal = 0;
-                StrSubtotal = "0 VND";
+                StrSubtotal = MoneyFormatter.FormatVnd(0);
             });
             SortingFeature_Command = new RelayCommand<object>((p) => true, (p) => {
                 SortMenuItems();
@@ -106,7 +107,7 @@ namespace QuanLyNhaHang.ViewModel
                         mess = "Đã báo chế biến thành công!";
                         SelectedItems.Clear();
                         DecSubtotal = 0;
-                        StrSubtotal = "0 VND";
+                        StrSubtotal = MoneyFormatter.FormatVnd(0);
                         Tables = MenuDP.Flag.GetTables();
                         Kho = MenuDP.Flag.GetIngredients();
                     }
@@ -148,7 +149,7 @@ namespace QuanLyNhaHang.ViewModel
         private CollectionViewSource _menuItemsView = new CollectionViewSource();
         private string myComboboxSelection = "A -> Z";
         private decimal dec_subtotal = 0;
-        private string str_subtotal = "0 VND";
+        private string str_subtotal = MoneyFormatter.FormatVnd(0);
         private string _searchText = string.Empty;
         private string MaNV = string.Empty;
         private int _currentOpenOrderId = 0;
@@ -269,14 +270,14 @@ namespace QuanLyNhaHang.ViewModel
                     {
                         x.Quantity++;
                         DecSubtotal += item.Price;
-                        StrSubtotal = String.Format("{0:0,0 VND}", DecSubtotal);
+                        StrSubtotal = MoneyFormatter.FormatVnd(DecSubtotal);
                         return;
                     }
 
                     SelectedMenuItem s_item = new SelectedMenuItem(item.ID, item.FoodName, item.Price, 1, false);
                     SelectedItems.Add(s_item);
                     DecSubtotal += item.Price;
-                    StrSubtotal = String.Format("{0:0,0 VND}", DecSubtotal);
+                    StrSubtotal = MoneyFormatter.FormatVnd(DecSubtotal);
                     break;
                 }
             }
@@ -291,7 +292,7 @@ namespace QuanLyNhaHang.ViewModel
             }
 
             DecSubtotal -= x.Price;
-            StrSubtotal = String.Format("{0:0,0 VND}", DecSubtotal);
+            StrSubtotal = MoneyFormatter.FormatVnd(DecSubtotal);
             if (x.Quantity > 1)
             {
                 x.Quantity--;
@@ -464,7 +465,7 @@ namespace QuanLyNhaHang.ViewModel
             }
 
             DecSubtotal = subtotal;
-            StrSubtotal = String.Format("{0:0,0 VND}", DecSubtotal);
+            StrSubtotal = MoneyFormatter.FormatVnd(DecSubtotal);
         }
 
         #endregion

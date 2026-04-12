@@ -12,6 +12,7 @@ using System.Data.SqlClient;
 using System.Configuration;
 using System.Data;
 using QuanLyNhaHang.DataProvider;
+using QuanLyNhaHang.Utils;
 
 namespace QuanLyNhaHang.ViewModel
 {
@@ -36,9 +37,9 @@ namespace QuanLyNhaHang.ViewModel
         private string selectedYear = DateTime.Now.Year.ToString();
         private string[] labels;
         private double dec_sumofprofit = 0;
-        private string sumofprofit = "0 VND";
+        private string sumofprofit = MoneyFormatter.FormatVnd(0);
         private double dec_sumofpaid = 0;
-        private string sumofpaid = "0 VND";
+        private string sumofpaid = MoneyFormatter.FormatVnd(0);
         private string visibility = "hidden";
 
         #endregion
@@ -193,7 +194,7 @@ namespace QuanLyNhaHang.ViewModel
                 //Tinh so tien thu duoc theo ngay cua thang
                 ProfitbyMonth[i] = ThongKeDP.Flag.GetBillofDay(day.ToShortDateString()) / 1000000; 
                 DecSumofProfit += ThongKeDP.Flag.GetBillofDay(day.ToShortDateString());
-                SumofProfit = String.Format("{0:0,0 VND}", DecSumofProfit);
+                SumofProfit = MoneyFormatter.FormatVnd(Convert.ToDecimal(DecSumofProfit));
             }
             SeriesCollection.Add(new LineSeries
             {
@@ -211,7 +212,7 @@ namespace QuanLyNhaHang.ViewModel
                 //Tinh so tien chi ra theo ngay cua thang
                 PaidbyMonth[i] = ThongKeDP.Flag.GetPaidofDay(day.ToShortDateString()) / 1000000;
                 DecSumofPaid += ThongKeDP.Flag.GetPaidofDay(day.ToShortDateString());
-                SumofPaid = String.Format("{0:0,0 VND}", DecSumofPaid);
+                SumofPaid = MoneyFormatter.FormatVnd(Convert.ToDecimal(DecSumofPaid));
             }
             SeriesCollection.Add(new LineSeries
             {
@@ -236,7 +237,7 @@ namespace QuanLyNhaHang.ViewModel
 
                 ProfitbyYear[i] = ThongKeDP.Flag.GetBillofMonth((i + 1).ToString(), SelectedYear) / 1000000;  
                 DecSumofProfit += ThongKeDP.Flag.GetBillofMonth((i + 1).ToString(), SelectedYear);
-                SumofProfit = String.Format("{0:0,0 VND}", DecSumofProfit);
+                SumofProfit = MoneyFormatter.FormatVnd(Convert.ToDecimal(DecSumofProfit));
             }
             SeriesCollection.Add(new LineSeries
             {
@@ -252,7 +253,7 @@ namespace QuanLyNhaHang.ViewModel
 
                 PaidbyYear[i] = ThongKeDP.Flag.GetPaidofMonth((i + 1).ToString(), SelectedYear) / 1000000; 
                 DecSumofPaid += ThongKeDP.Flag.GetPaidofMonth((i + 1).ToString(), SelectedYear);
-                SumofPaid = String.Format("{0:0,0 VND}", DecSumofPaid);
+                SumofPaid = MoneyFormatter.FormatVnd(Convert.ToDecimal(DecSumofPaid));
             }
             SeriesCollection.Add(new LineSeries
             {
