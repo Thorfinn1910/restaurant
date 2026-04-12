@@ -14,6 +14,22 @@ namespace QuanLyNhaHang.DataProvider
 {
     public class MenuDP : DataProvider
     {
+        public sealed class IngredientAvailabilityResult
+        {
+            public IngredientAvailabilityResult(
+                IReadOnlyList<string> insufficientIngredients,
+                IReadOnlyList<string> dishesWithoutRecipe)
+            {
+                InsufficientIngredients = insufficientIngredients;
+                DishesWithoutRecipe = dishesWithoutRecipe;
+            }
+
+            public IReadOnlyList<string> InsufficientIngredients { get; }
+            public IReadOnlyList<string> DishesWithoutRecipe { get; }
+            public bool HasMissingRecipe => DishesWithoutRecipe.Count > 0;
+            public bool HasInsufficientIngredient => InsufficientIngredients.Count > 0;
+        }
+
         private static MenuDP flag;
         public static MenuDP Flag
         {
@@ -51,44 +67,89 @@ namespace QuanLyNhaHang.DataProvider
             }
             return menuItems;
         }
-        public void InformChef(string maMon, int soban, int soluong)
+        public int CreateOpenOrderTransactional(int soBan, string maNV, IEnumerable<SelectedMenuItem> items)
         {
-            try
+            if (string.IsNullOrWhiteSpace(maNV))
             {
-                SqlCommand cmd = new SqlCommand();
-                cmd.CommandText = "Exec Inform_Chef_PD @mamon, @soban, @soluong, @ngaycb, @trangthai, @trangthaiban";
-                cmd.Parameters.AddWithValue("@mamon", maMon);
-                cmd.Parameters.AddWithValue("@soban", soban);
-                cmd.Parameters.AddWithValue("@soluong", soluong);
-                cmd.Parameters.AddWithValue("@ngaycb", DateTime.Now);
-                cmd.Parameters.AddWithValue("@trangthai", "Đang chế biến");
-                cmd.Parameters.AddWithValue("@trangthaiban", "Đang được sử dụng");
-                DBOpen();
-                cmd.Connection = SqlCon;
-                cmd.ExecuteNonQuery();
+                throw new InvalidOperationException("Không xác định được nhân viên đang thao tác.");
             }
-            finally
-            {
-                DBClose();
-            }
-        }
 
-        public void PayABill(Int16 soban, Decimal sum, string MaNV)
-        {
+            Dictionary<string, int> normalizedItems = NormalizeOrderItems(items);
+            if (normalizedItems.Count == 0)
+            {
+                throw new InvalidOperationException("Order chưa có món.");
+            }
+
+            DBOpen();
+            SqlTransaction transaction = SqlCon.BeginTransaction();
             try
             {
-                DBOpen();
-                SqlCommand cmd = new SqlCommand();
-                cmd.CommandText = "Exec PAY_A_BILL_PD @trigia, @manv, @soban, @ngayHD, @trangthai";
-                cmd.Parameters.AddWithValue("@trigia", sum);
-                cmd.Parameters.AddWithValue("@manv", MaNV);
-                cmd.Parameters.AddWithValue("@soban", soban);
-                cmd.Parameters.AddWithValue("@ngayHD", DateTime.Now);
-                cmd.Parameters.AddWithValue("@trangthai", "Chưa trả");
-                DBOpen();
-                cmd.Connection = SqlCon;
-                
-                cmd.ExecuteNonQuery();
+                EnsureTableCanCreateOpenOrder(soBan, transaction);
+                ReserveIngredientsForOrder(normalizedItems, transaction);
+
+                int soHd;
+                using (SqlCommand insertBill = new SqlCommand(
+                    "INSERT INTO HOADON (TriGia, MaNV, SoBan, NgayHD, TrangThai) " +
+                    "OUTPUT INSERTED.SoHD VALUES (@triGia, @maNV, @soBan, @ngayHD, @trangThai)",
+                    SqlCon,
+                    transaction))
+                {
+                    insertBill.Parameters.AddWithValue("@triGia", 0m);
+                    insertBill.Parameters.AddWithValue("@maNV", maNV);
+                    insertBill.Parameters.AddWithValue("@soBan", soBan);
+                    insertBill.Parameters.AddWithValue("@ngayHD", DateTime.Now);
+                    insertBill.Parameters.AddWithValue("@trangThai", "Chưa trả");
+                    soHd = Convert.ToInt32(insertBill.ExecuteScalar());
+                }
+
+                foreach (KeyValuePair<string, int> item in normalizedItems)
+                {
+                    using SqlCommand insertDetail = new SqlCommand(
+                        "INSERT INTO CTHD (SoHD, MaMon, SoLuong) VALUES (@soHd, @maMon, @soLuong)",
+                        SqlCon,
+                        transaction);
+                    insertDetail.Parameters.AddWithValue("@soHd", soHd);
+                    insertDetail.Parameters.AddWithValue("@maMon", item.Key);
+                    insertDetail.Parameters.AddWithValue("@soLuong", item.Value);
+                    insertDetail.ExecuteNonQuery();
+
+                    using SqlCommand insertChef = new SqlCommand(
+                        "INSERT INTO CHEBIEN (MaMon, SoBan, SoLuong, NgayCB, TrangThai) VALUES (@maMon, @soBan, @soLuong, @ngayCB, @trangThai)",
+                        SqlCon,
+                        transaction);
+                    insertChef.Parameters.AddWithValue("@maMon", item.Key);
+                    insertChef.Parameters.AddWithValue("@soBan", soBan);
+                    insertChef.Parameters.AddWithValue("@soLuong", item.Value);
+                    insertChef.Parameters.AddWithValue("@ngayCB", DateTime.Now);
+                    insertChef.Parameters.AddWithValue("@trangThai", "Đang chế biến");
+                    insertChef.ExecuteNonQuery();
+                }
+
+                using (SqlCommand updateBill = new SqlCommand(
+                    "UPDATE HOADON SET TriGia = ISNULL((SELECT SUM(c.SoLuong * m.Gia) FROM CTHD c JOIN MENU m ON m.MaMon = c.MaMon WHERE c.SoHD = @soHd), 0) WHERE SoHD = @soHd",
+                    SqlCon,
+                    transaction))
+                {
+                    updateBill.Parameters.AddWithValue("@soHd", soHd);
+                    updateBill.ExecuteNonQuery();
+                }
+
+                using (SqlCommand updateTable = new SqlCommand(
+                    "UPDATE BAN SET TrangThai = N'Đang được sử dụng' WHERE SoBan = @soBan",
+                    SqlCon,
+                    transaction))
+                {
+                    updateTable.Parameters.AddWithValue("@soBan", soBan);
+                    updateTable.ExecuteNonQuery();
+                }
+
+                transaction.Commit();
+                return soHd;
+            }
+            catch
+            {
+                transaction.Rollback();
+                throw;
             }
             finally
             {
@@ -464,40 +525,87 @@ namespace QuanLyNhaHang.DataProvider
             ObservableCollection<ChiTietMon> ctm = new ObservableCollection<ChiTietMon>();
             try
             {
-                string fullQuery = string.Empty;
-                string outerquery = "select T.TenNL, SUM(T.SoLuong) as Tong from ( ";
-                string endquery = " ) as T group by T.TenNL";
-                string query = "select TenNL, SoLuong from CHITIETMON where ";
-                query += $"MaMon = '{arr[0].ID}'";
-                if(arr.Count > 1)
+                Dictionary<string, int> normalizedItems = NormalizeOrderItems(arr);
+                if (normalizedItems.Count == 0)
                 {
-                    for (int i = 1; i < arr.Count; i++)
-                    {
-                        query += $" or MaMon = '{arr[i].ID}'";
-                    }
+                    return ctm;
                 }
-                fullQuery = outerquery + query + endquery;
-                DataTable dt = LoadInitialData(fullQuery);
-                foreach(DataRow dr in dt.Rows)
+
+                DBOpen();
+                Dictionary<string, double> requiredIngredients = GetRequiredIngredients(normalizedItems, null, out _);
+                foreach (KeyValuePair<string, double> item in requiredIngredients)
                 {
-                    ctm.Add(new ChiTietMon(dr["TenNL"].ToString(), (float)Convert.ToDouble(dr["Tong"])));
+                    ctm.Add(new ChiTietMon(item.Key, (float)item.Value));
                 }
-            } finally
+            }
+            finally
             {
                 DBClose();
 
             }
             return ctm;
         }
+
+        public IngredientAvailabilityResult CheckIngredientAvailability(IEnumerable<SelectedMenuItem> items)
+        {
+            Dictionary<string, int> normalizedItems = NormalizeOrderItems(items);
+            if (normalizedItems.Count == 0)
+            {
+                return new IngredientAvailabilityResult(Array.Empty<string>(), Array.Empty<string>());
+            }
+
+            DBOpen();
+            try
+            {
+                Dictionary<string, double> requiredIngredients = GetRequiredIngredients(normalizedItems, null, out HashSet<string> dishesWithoutRecipe);
+                List<string> insufficientIngredients = new List<string>();
+                foreach (KeyValuePair<string, double> ingredient in requiredIngredients)
+                {
+                    using SqlCommand stockCmd = new SqlCommand(
+                        "SELECT TonDu FROM KHO WHERE TenSanPham = @tenSanPham",
+                        SqlCon);
+                    stockCmd.Parameters.AddWithValue("@tenSanPham", ingredient.Key);
+                    object? stockValue = stockCmd.ExecuteScalar();
+                    if (stockValue == null || stockValue == DBNull.Value)
+                    {
+                        insufficientIngredients.Add(ingredient.Key);
+                        continue;
+                    }
+
+                    double currentStock = Convert.ToDouble(stockValue);
+                    if (currentStock < ingredient.Value)
+                    {
+                        insufficientIngredients.Add(ingredient.Key);
+                    }
+                }
+
+                return new IngredientAvailabilityResult(
+                    insufficientIngredients.Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
+                    dishesWithoutRecipe.ToList());
+            }
+            finally
+            {
+                DBClose();
+            }
+        }
+
         public ObservableCollection<ChiTietMon> GetIngredientsForDish(string MaMon)
         {
             ObservableCollection<ChiTietMon> Ingredients = new ObservableCollection<ChiTietMon>();
             try
             {
-                DataTable dt = LoadInitialData($"Select * from CHITIETMON where MaMon = '{MaMon}'");
-                foreach(DataRow dr in dt.Rows)
+                DBOpen();
+                using SqlCommand cmd = new SqlCommand(
+                    "SELECT MaMon, TenNL, SoLuong FROM CHITIETMON WHERE MaMon = @maMon",
+                    SqlCon);
+                cmd.Parameters.AddWithValue("@maMon", MaMon);
+                using SqlDataReader reader = cmd.ExecuteReader();
+                while (reader.Read())
                 {
-                    Ingredients.Add(new ChiTietMon(dr["TenNL"].ToString(), dr["MaMon"].ToString(), (float)Convert.ToDouble(dr["SoLuong"])));
+                    Ingredients.Add(new ChiTietMon(
+                        reader.GetString(1),
+                        reader.GetString(0),
+                        (float)Convert.ToDouble(reader.GetValue(2))));
                 }
             }
             finally
@@ -897,6 +1005,118 @@ namespace QuanLyNhaHang.DataProvider
             }
         }
 
+        private void EnsureTableCanCreateOpenOrder(int soBan, SqlTransaction transaction)
+        {
+            using SqlCommand hasOpenOrder = new SqlCommand(
+                "SELECT COUNT(1) FROM HOADON WITH (UPDLOCK, HOLDLOCK) WHERE SoBan = @soBan AND TrangThai = N'Chưa trả'",
+                SqlCon,
+                transaction);
+            hasOpenOrder.Parameters.AddWithValue("@soBan", soBan);
+            if (Convert.ToInt32(hasOpenOrder.ExecuteScalar()) > 0)
+            {
+                throw new InvalidOperationException("Bàn hiện đang có order mở.");
+            }
+        }
+
+        private Dictionary<string, int> NormalizeOrderItems(IEnumerable<SelectedMenuItem> items)
+        {
+            Dictionary<string, int> result = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            if (items == null)
+            {
+                return result;
+            }
+
+            foreach (SelectedMenuItem item in items)
+            {
+                if (item == null || string.IsNullOrWhiteSpace(item.ID))
+                {
+                    continue;
+                }
+
+                if (item.Quantity <= 0)
+                {
+                    throw new InvalidOperationException("Số lượng món phải lớn hơn 0.");
+                }
+
+                result[item.ID] = result.TryGetValue(item.ID, out int qty) ? qty + item.Quantity : item.Quantity;
+            }
+            return result;
+        }
+
+        private Dictionary<string, double> GetRequiredIngredients(
+            IReadOnlyDictionary<string, int> orderItems,
+            SqlTransaction? transaction,
+            out HashSet<string> dishesWithoutRecipe)
+        {
+            Dictionary<string, double> requiredIngredients = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+            dishesWithoutRecipe = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (KeyValuePair<string, int> item in orderItems)
+            {
+                bool hasRecipe = false;
+                using SqlCommand recipeCmd = transaction == null
+                    ? new SqlCommand("SELECT TenNL, SoLuong FROM CHITIETMON WHERE MaMon = @maMon", SqlCon)
+                    : new SqlCommand("SELECT TenNL, SoLuong FROM CHITIETMON WITH (UPDLOCK, HOLDLOCK) WHERE MaMon = @maMon", SqlCon, transaction);
+
+                recipeCmd.Parameters.AddWithValue("@maMon", item.Key);
+                using SqlDataReader reader = recipeCmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    hasRecipe = true;
+                    string ingredientName = reader.GetString(0);
+                    double recipeQty = Convert.ToDouble(reader.GetValue(1));
+                    double requiredQty = recipeQty * item.Value;
+                    requiredIngredients[ingredientName] = requiredIngredients.TryGetValue(ingredientName, out double oldQty)
+                        ? oldQty + requiredQty
+                        : requiredQty;
+                }
+
+                if (!hasRecipe)
+                {
+                    dishesWithoutRecipe.Add(item.Key);
+                }
+            }
+
+            return requiredIngredients;
+        }
+
+        private void ReserveIngredientsForOrder(IReadOnlyDictionary<string, int> orderItems, SqlTransaction transaction)
+        {
+            Dictionary<string, double> requiredIngredients = GetRequiredIngredients(orderItems, transaction, out HashSet<string> dishesWithoutRecipe);
+            if (dishesWithoutRecipe.Count > 0)
+            {
+                throw new InvalidOperationException("Hãy thêm thông tin nguyên liệu cho món!");
+            }
+
+            foreach (KeyValuePair<string, double> ingredient in requiredIngredients)
+            {
+                using SqlCommand stockCmd = new SqlCommand(
+                    "SELECT TonDu FROM KHO WITH (UPDLOCK, HOLDLOCK) WHERE TenSanPham = @tenSanPham",
+                    SqlCon,
+                    transaction);
+                stockCmd.Parameters.AddWithValue("@tenSanPham", ingredient.Key);
+                object? stockValue = stockCmd.ExecuteScalar();
+                if (stockValue == null || stockValue == DBNull.Value)
+                {
+                    throw new InvalidOperationException("Không tìm thấy nguyên liệu trong kho: " + ingredient.Key);
+                }
+
+                double newStock = Convert.ToDouble(stockValue) - ingredient.Value;
+                if (newStock < 0)
+                {
+                    throw new InvalidOperationException("Không đủ nguyên liệu trong kho: " + ingredient.Key);
+                }
+
+                using SqlCommand updateStock = new SqlCommand(
+                    "UPDATE KHO SET TonDu = @tonDu WHERE TenSanPham = @tenSanPham",
+                    SqlCon,
+                    transaction);
+                updateStock.Parameters.AddWithValue("@tonDu", newStock);
+                updateStock.Parameters.AddWithValue("@tenSanPham", ingredient.Key);
+                updateStock.ExecuteNonQuery();
+            }
+        }
+
         private static string QuoteIdentifier(string identifier)
         {
             return "[" + identifier.Replace("]", "]]") + "]";
@@ -1034,44 +1254,47 @@ namespace QuanLyNhaHang.DataProvider
                 DBClose();
             }
         }
-        public void Fill_CTHD(string MaMon, int SoLuong)
+        [Obsolete("Use CreateOpenOrderTransactional or UpdateOpenOrder instead.")]
+        public void Fill_CTHD(int soHd, string maMon, int soLuong)
         {
+            if (soHd <= 0)
+            {
+                throw new InvalidOperationException("Số hóa đơn không hợp lệ.");
+            }
+
             try
             {
                 DBOpen();
-                SqlCommand cmd_InsertDetail = new SqlCommand();
-                cmd_InsertDetail.CommandText = "Exec INSERT_DETAIL_PD @mamon, @soluong";
-                cmd_InsertDetail.Parameters.AddWithValue("@mamon", MaMon);
-                cmd_InsertDetail.Parameters.AddWithValue("@soluong", SoLuong);
-                DBOpen();
-                cmd_InsertDetail.Connection = SqlCon;
-
-                cmd_InsertDetail.ExecuteNonQuery();
-            }
-            catch (SqlException ex)
-            {
-                UpdateCTHD(MaMon, SoLuong);
+                UpdateCTHD(soHd, maMon, soLuong);
             }
             finally
             {
                 DBClose();
             }
-            
         }
-        public void UpdateCTHD(string MaMon, int SoLuong)
+
+        public void UpdateCTHD(int soHd, string maMon, int soLuong)
         {
             try
             {
                 DBOpen();
-                SqlCommand cmd = new SqlCommand();
-                cmd.CommandText = "UPDATE CTHD " +
-                                  "SET SOLUONG = @soluong " +
-                                  "WHERE SoHD = (SELECT IDENT_CURRENT('HOADON')) AND MaMon = @mamon";
-                cmd.Parameters.AddWithValue("@mamon", MaMon);
-                cmd.Parameters.AddWithValue("@soluong", SoLuong);
-
-                cmd.Connection = SqlCon;
-                cmd.ExecuteNonQuery();
+                using SqlCommand cmd = new SqlCommand(
+                    "UPDATE CTHD SET SoLuong = @soLuong WHERE SoHD = @soHd AND MaMon = @maMon",
+                    SqlCon);
+                cmd.Parameters.AddWithValue("@soLuong", soLuong);
+                cmd.Parameters.AddWithValue("@soHd", soHd);
+                cmd.Parameters.AddWithValue("@maMon", maMon);
+                int affected = cmd.ExecuteNonQuery();
+                if (affected == 0)
+                {
+                    using SqlCommand insert = new SqlCommand(
+                        "INSERT INTO CTHD (SoHD, MaMon, SoLuong) VALUES (@soHd, @maMon, @soLuong)",
+                        SqlCon);
+                    insert.Parameters.AddWithValue("@soHd", soHd);
+                    insert.Parameters.AddWithValue("@maMon", maMon);
+                    insert.Parameters.AddWithValue("@soLuong", soLuong);
+                    insert.ExecuteNonQuery();
+                }
 
             }
             finally

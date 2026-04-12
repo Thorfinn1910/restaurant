@@ -1,27 +1,24 @@
-﻿using QuanLyNhaHang.Models;
-using System;
-using System.Collections.ObjectModel;
-using System.Data.SqlClient;
-using System.Data;
-using System.Linq;
-using System.Windows.Input;
-using SaveFileDialog = System.Windows.Forms.SaveFileDialog;
 using OfficeOpenXml;
 using OfficeOpenXml.Style;
+using QuanLyNhaHang.DataProvider;
+using QuanLyNhaHang.Models;
+using SaveFileDialog = System.Windows.Forms.SaveFileDialog;
+using System;
+using System.Collections.ObjectModel;
+using System.Globalization;
 using System.IO;
-using System.Configuration;
+using System.Linq;
 using System.Windows.Forms;
-using LicenseContext = OfficeOpenXml.LicenseContext;
+using System.Windows.Input;
 
 namespace QuanLyNhaHang.ViewModel
 {
     public class ChamCongViewModel : BaseViewModel
     {
-        private ObservableCollection<string> _ListMonth;
+        private ObservableCollection<string> _ListMonth = new ObservableCollection<string>();
         public ObservableCollection<string> ListMonth { get => _ListMonth; set { _ListMonth = value; OnPropertyChanged(); } }
 
-
-        private string _MonthSelected;
+        private string _MonthSelected = string.Empty;
         public string MonthSelected
         {
             get => _MonthSelected;
@@ -31,12 +28,17 @@ namespace QuanLyNhaHang.ViewModel
                 OnPropertyChanged();
                 ListViewDisplay();
                 GetListDay();
-                DaySelected = ListDay[ListDay.Count - 1];
+                if (ListDay.Count > 0)
+                {
+                    DaySelected = ListDay[ListDay.Count - 1];
+                }
             }
         }
-        private ObservableCollection<string> _ListDay;
+
+        private ObservableCollection<string> _ListDay = new ObservableCollection<string>();
         public ObservableCollection<string> ListDay { get => _ListDay; set { _ListDay = value; OnPropertyChanged(); } }
-        private string _DaySelected;
+
+        private string _DaySelected = string.Empty;
         public string DaySelected
         {
             get => _DaySelected;
@@ -48,18 +50,16 @@ namespace QuanLyNhaHang.ViewModel
             }
         }
 
-
-        private ObservableCollection<NhanVienCC> _ListStaff;
+        private ObservableCollection<NhanVienCC> _ListStaff = new ObservableCollection<NhanVienCC>();
         public ObservableCollection<NhanVienCC> ListStaff { get => _ListStaff; set { _ListStaff = value; OnPropertyChanged(); } }
-        private ObservableCollection<ChamCong> _ListCheck;
-        public ObservableCollection<ChamCong> ListCheck { get => _ListCheck; set { _ListCheck = value; OnPropertyChanged(); } }
 
-        private string strCon = ConfigurationManager.ConnectionStrings["QuanLyNhaHang"].ConnectionString;
-        private SqlConnection sqlCon = null;
+        private ObservableCollection<ChamCong> _ListCheck = new ObservableCollection<ChamCong>();
+        public ObservableCollection<ChamCong> ListCheck { get => _ListCheck; set { _ListCheck = value; OnPropertyChanged(); } }
 
         public ICommand CloseCM { get; set; }
         public ICommand ExportCM { get; set; }
         public ICommand SaveCM { get; set; }
+
         public ChamCongViewModel()
         {
             ListMonth = new ObservableCollection<string>();
@@ -71,19 +71,15 @@ namespace QuanLyNhaHang.ViewModel
             MonthSelected = DateTime.Now.Month + "/" + DateTime.Now.Year;
             ListViewDisplay();
 
-
-            CloseCM = new RelayCommand<System.Windows.Window>((p) => { return true; }, (p) =>
+            CloseCM = new RelayCommand<System.Windows.Window>((p) => true, (p) =>
             {
                 if (p == null) return;
                 p.Close();
             });
 
-            #region // export command
-            ExportCM = new RelayCommand<object>((p) => { return true; }, (p) =>
+            ExportCM = new RelayCommand<object>((p) => true, (p) =>
             {
-                OpenConnect();
-
-                string filePath = "";
+                string filePath = string.Empty;
 
                 SaveFileDialog dialog = new SaveFileDialog();
                 dialog.Filter = "Excel (*.xlsx)|*.xlsx";
@@ -100,23 +96,21 @@ namespace QuanLyNhaHang.ViewModel
                         return;
                     }
 
-                    ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+                    ExcelPackage.LicenseContext = OfficeOpenXml.LicenseContext.NonCommercial;
+                    int month = int.Parse(GetMonth(MonthSelected));
+                    int year = DateTime.Now.Year;
+                    ObservableCollection<ChamCongDP.AttendanceExportRow> rows = ChamCongDP.Flag.GetAttendanceRowsForMonth(month, year);
 
                     using (ExcelPackage x = new ExcelPackage())
                     {
-                        x.Workbook.Properties.Title = "Chấm công tháng " + GetMonth(MonthSelected) + "/" + DateTime.Now.Year;
-
+                        x.Workbook.Properties.Title = "Chấm công tháng " + month + "/" + year;
                         x.Workbook.Worksheets.Add("Sheet");
-
                         ExcelWorksheet ws = x.Workbook.Worksheets[0];
-
                         ws.Cells.Style.Font.Name = "Times New Roman";
 
-
                         string[] columnHeader = { "Họ tên", "Ngày", "Số giờ", "Ghi chú" };
-
                         int countColumn = columnHeader.Count();
-                        ws.Cells[1, 1].Value = "Bảng chấm công tháng " + GetMonth(MonthSelected) + "/" + DateTime.Now.Year;
+                        ws.Cells[1, 1].Value = "Bảng chấm công tháng " + month + "/" + year;
                         ws.Cells[1, 1, 1, countColumn].Merge = true;
                         ws.Cells[1, 1, 1, countColumn].Style.Font.Bold = true;
                         ws.Cells[1, 1, 1, countColumn].Style.Font.Size = 16;
@@ -124,7 +118,6 @@ namespace QuanLyNhaHang.ViewModel
 
                         int row = 2;
                         int col = 1;
-
                         foreach (string column in columnHeader)
                         {
                             var cell = ws.Cells[row, col];
@@ -133,24 +126,21 @@ namespace QuanLyNhaHang.ViewModel
                             col++;
                         }
 
-                        SqlCommand cmd = new SqlCommand();
-                        cmd.CommandType = CommandType.Text;
-                        cmd.CommandText = "SELECT c.*, n.TenNV FROM CHITIETCHAMCONG AS c JOIN NHANVIEN AS n ON c.MaNV = n.MaNV WHERE MONTH(NgayCC) = " + GetMonth(MonthSelected) + " AND YEAR(NgayCC) = " + DateTime.Now.Year + " ORDER BY MaNV, NgayCC ASC";
-                        cmd.Connection = sqlCon;
-                        SqlDataReader reader = cmd.ExecuteReader();
-
-                        while (reader.Read())
+                        foreach (ChamCongDP.AttendanceExportRow attendanceRow in rows)
                         {
                             row++;
                             col = 1;
-                            string ten = reader.GetString(4);
-                            if (ten != ws.Cells[row - 1, 1].Value.ToString()) row++;
+                            string ten = attendanceRow.EmployeeName;
+                            if (ws.Cells[row - 1, 1].Value != null && ten != ws.Cells[row - 1, 1].Value.ToString())
+                            {
+                                row++;
+                            }
+
                             ws.Cells[row, col++].Value = ten;
-                            ws.Cells[row, col++].Value = reader.GetDateTime(1).ToShortDateString();
-                            ws.Cells[row, col++].Value = reader.GetDouble(2).ToString();
-                            ws.Cells[row, col++].Value = reader.GetString(3);
+                            ws.Cells[row, col++].Value = attendanceRow.Day.ToShortDateString();
+                            ws.Cells[row, col++].Value = attendanceRow.Hours.ToString(CultureInfo.InvariantCulture);
+                            ws.Cells[row, col++].Value = attendanceRow.Note;
                         }
-                        reader.Close();
 
                         row += 2;
                         ws.Cells[row, 2].Value = "Tổng số giờ";
@@ -163,20 +153,15 @@ namespace QuanLyNhaHang.ViewModel
                             ws.Cells[row, col++].Value = nv.TongSoGio;
                         }
 
-                        Byte[] bin = x.GetAsByteArray();
+                        byte[] bin = x.GetAsByteArray();
                         File.WriteAllBytes(filePath, bin);
-                    };
+                    }
+
                     MyMessageBox msb = new MyMessageBox("Xuất file thành công!");
                     msb.ShowDialog();
                 }
-
-
-
-                CloseConnect();
             });
-            #endregion
 
-            #region //save command
             SaveCM = new RelayCommand<object>((p) =>
             {
                 foreach (ChamCong nv in ListCheck)
@@ -184,235 +169,148 @@ namespace QuanLyNhaHang.ViewModel
                     if (string.IsNullOrEmpty(nv.SoGioCong)) return false;
                     if (!isFloat(nv.SoGioCong)) return false;
                 }
+
                 return true;
             }, (p) =>
             {
-                OpenConnect();
-
-                SqlCommand cmd = new SqlCommand();
-                cmd.CommandType = CommandType.Text;
-                cmd.CommandText = "SELECT * FROM CHITIETCHAMCONG WHERE NgayCC = '" + DaySelected + "'";
-                cmd.Connection = sqlCon;
-                SqlDataReader reader = cmd.ExecuteReader();
-
-                bool update = reader.Read();
-                bool result = true;
-                reader.Close();
-
-                if (update)
+                try
                 {
-                    foreach (ChamCong nv in ListCheck)
+                    DateTime selectedDay = ParseSelectedDay();
+                    bool result = ChamCongDP.Flag.SaveAttendanceByDay(selectedDay, ListCheck);
+                    if (result)
                     {
-                        cmd.CommandText = "UPDATE CHITIETCHAMCONG SET SoGioCong = " + nv.SoGioCong + " WHERE NgayCC = '" + DaySelected + "' AND MaNV = '" + nv.MaNV + "'";
-                        cmd.Connection = sqlCon;
-                        int kq = cmd.ExecuteNonQuery();
-                        if (kq == 0) result = false;
+                        MyMessageBox msb = new MyMessageBox("Chấm công thành công!");
+                        msb.ShowDialog();
                     }
-                }
-                else
-                {
-                    foreach (ChamCong nv in ListCheck)
+                    else
                     {
-                        cmd.CommandText = "INSERT INTO CHITIETCHAMCONG VALUES('" + nv.MaNV + "', '" + DaySelected + "', " + nv.SoGioCong + ", N'" + nv.GhiChu + "')";
-                        cmd.Connection = sqlCon;
-                        int kq = cmd.ExecuteNonQuery();
-                        if (kq == 0) result = false;
+                        MyMessageBox msb = new MyMessageBox("Chấm công không thành công!");
+                        msb.ShowDialog();
                     }
+
+                    ListViewDisplay();
                 }
-                if (result)
+                catch (Exception ex)
                 {
-                    MyMessageBox msb = new MyMessageBox("Chấm công thành công!");
+                    MyMessageBox msb = new MyMessageBox(ex.Message);
                     msb.ShowDialog();
                 }
-                else
-                {
-                    MyMessageBox msb = new MyMessageBox("Chấm công không thành công!");
-                    msb.ShowDialog();
-                }
-                ListViewDisplay();
-
-                CloseConnect();
             });
-            #endregion
         }
 
         private void ListViewDisplay()
         {
-            OpenConnect();
+            int month = int.Parse(GetMonth(MonthSelected));
+            int year = DateTime.Now.Year;
 
-            SqlCommand cmd = new SqlCommand();
-            cmd.CommandType = CommandType.Text;
-            cmd.CommandText = "SELECT * FROM NHANVIEN ORDER BY MaNV ASC";
-            cmd.Connection = sqlCon;
-            SqlDataReader reader = cmd.ExecuteReader();
-
-            ListStaff.Clear();
-            while (reader.Read())
+            ListStaff = ChamCongDP.Flag.GetEmployees();
+            var summary = ChamCongDP.Flag.GetMonthlyAttendanceSummary(month, year);
+            foreach (NhanVienCC nv in ListStaff)
             {
-                string ma = reader.GetString(0);
-                string ten = reader.GetString(1);
-                string chucvu = reader.GetString(2);
-                string ft;
-                if (reader.GetBoolean(3)) ft = "Full-time";
-                else ft = "Part-time";
-
-                ListStaff.Add(new NhanVienCC(ma, ten, chucvu, ft));
-            }
-            reader.Close();
-
-            cmd.CommandText = "SELECT MaNV, SUM(SoGioCong) FROM CHITIETCHAMCONG WHERE MONTH(NgayCC) = " + GetMonth(MonthSelected) + " AND YEAR(NgayCC) = " + DateTime.Now.Year + " GROUP BY MaNV ORDER BY MaNV ASC";
-            cmd.Connection = sqlCon;
-            reader = cmd.ExecuteReader();
-
-            while (reader.Read())
-            {
-                string ma = reader.GetString(0);
-                float tonggio = (float)reader.GetDouble(1);
-                foreach (NhanVienCC nv in ListStaff)
+                if (summary.TryGetValue(nv.MaNV, out float tonggio))
                 {
-                    if (nv.MaNV == ma) nv.TongSoGio = tonggio;
+                    nv.TongSoGio = tonggio;
                 }
             }
-            reader.Close();
-
-            CloseConnect();
         }
+
         private void GetListMonth()
         {
             ListMonth.Clear();
             int month = 1;
             while (month <= DateTime.Now.Month)
             {
-                ListMonth.Add(month.ToString() + "/" + DateTime.Now.Year.ToString());
+                ListMonth.Add(month + "/" + DateTime.Now.Year);
                 month++;
             }
         }
+
         private void GetListDay()
         {
             ListDay.Clear();
-            if (GetMonth(MonthSelected) == DateTime.Now.Month.ToString())
+            int year = DateTime.Now.Year;
+            int month = int.Parse(GetMonth(MonthSelected));
+
+            int lastDay;
+            if (month == DateTime.Now.Month)
             {
-                int day = 1;
-                while (day <= DateTime.Now.Day)
-                {
-                    ListDay.Add(GetMonth(MonthSelected) + "/" + day + "/" + DateTime.Now.Year);
-                    day++;
-                }
+                lastDay = DateTime.Now.Day;
             }
             else
             {
-                if (GetMonth(MonthSelected) == "1" || GetMonth(MonthSelected) == "3" || GetMonth(MonthSelected) == "5" || GetMonth(MonthSelected) == "7" || GetMonth(MonthSelected) == "8" || GetMonth(MonthSelected) == "10" || GetMonth(MonthSelected) == "12")
-                {
-                    int day = 1;
-                    while (day <= 31)
-                    {
-                        ListDay.Add(GetMonth(MonthSelected) + "/" + day + "/" + DateTime.Now.Year);
-                        day++;
-                    }
-                }
-                else
-                if (GetMonth(MonthSelected) == "4" || GetMonth(MonthSelected) == "6" || GetMonth(MonthSelected) == "9" || GetMonth(MonthSelected) == "11")
-                {
-                    int day = 1;
-                    while (day <= 30)
-                    {
-                        ListDay.Add(GetMonth(MonthSelected) + "/" + day + "/" + DateTime.Now.Year);
-                        day++;
-                    }
-                }
-                else
-                {
-                    int count;
-                    if (isLapYear(DateTime.Now.Year)) count = 29;
-                    else count = 28;
-                    int day = 1;
-                    while (day <= count)
-                    {
-                        ListDay.Add(day.ToString() + "/" + GetMonth(MonthSelected) + "/" + DateTime.Now.Year);
-                        day++;
-                    }
-                }
+                lastDay = DateTime.DaysInMonth(year, month);
+            }
+
+            for (int day = 1; day <= lastDay; day++)
+            {
+                ListDay.Add(new DateTime(year, month, day).ToString("M/d/yyyy"));
             }
         }
+
         private void GetListCheck()
         {
-            OpenConnect();
-
+            DateTime selectedDay = ParseSelectedDay();
             ListCheck.Clear();
             foreach (NhanVienCC nv in ListStaff)
             {
                 ListCheck.Add(new ChamCong(nv.MaNV));
             }
 
-            SqlCommand cmd = new SqlCommand();
-            cmd.CommandType = CommandType.Text;
-            cmd.CommandText = "SELECT * FROM CHITIETCHAMCONG WHERE NgayCC = '" + DaySelected + "' ORDER BY MaNV ASC";
-            cmd.Connection = sqlCon;
-            SqlDataReader reader = cmd.ExecuteReader();
-
-            while (reader.Read())
+            var dayAttendance = ChamCongDP.Flag.GetAttendanceByDay(selectedDay);
+            foreach (ChamCong nv in ListCheck)
             {
-                string ma = reader.GetString(0);
-                string ngay = reader.GetDateTime(1).ToShortDateString();
-                string gio = reader.GetDouble(2).ToString();
-                string note = reader.GetString(3);
-
-                foreach (ChamCong nv in ListCheck)
+                if (dayAttendance.TryGetValue(nv.MaNV, out ChamCong? dbRow))
                 {
-                    if (nv.MaNV == ma)
-                    {
-                        nv.Set(ngay, gio, note);
-                    }
+                    nv.Set(dbRow.NgayCC, dbRow.SoGioCong, dbRow.GhiChu);
                 }
             }
-            reader.Close();
 
-            cmd = new SqlCommand();
-            cmd.CommandType = CommandType.Text;
-            cmd.CommandText = "SELECT MaNV, NgayVaoLam FROM NHANVIEN ORDER BY MaNV ASC";
-            cmd.Connection = sqlCon;
-            reader = cmd.ExecuteReader();
-
-            while (reader.Read())
+            var startDates = ChamCongDP.Flag.GetEmployeeStartDates();
+            foreach (ChamCong nv in ListCheck)
             {
-                string maNV = reader.GetString(0);
-                string dateIn = reader.GetDateTime(1).ToShortDateString();
-                foreach (ChamCong nv in ListCheck)
+                if (startDates.TryGetValue(nv.MaNV, out DateTime startDate) && startDate > selectedDay.Date)
                 {
-                    if (nv.MaNV == maNV)
-                    {
-                        if (Convert.ToDateTime(dateIn) > Convert.ToDateTime(DaySelected))
-                        {
-                            nv.Set(DaySelected, "0", "Chưa vào làm");
-                        }
-                    }
+                    nv.Set(selectedDay.ToShortDateString(), "0", "Chưa vào làm");
                 }
             }
-            reader.Close();
-
-            CloseConnect();
         }
+
+        private DateTime ParseSelectedDay()
+        {
+            if (DateTime.TryParse(DaySelected, out DateTime parsed))
+            {
+                return parsed.Date;
+            }
+
+            string[] formats = { "M/d/yyyy", "d/M/yyyy", "MM/dd/yyyy", "dd/MM/yyyy" };
+            if (DateTime.TryParseExact(DaySelected, formats, CultureInfo.InvariantCulture, DateTimeStyles.None, out parsed))
+            {
+                return parsed.Date;
+            }
+
+            return DateTime.Today.Date;
+        }
+
         private string GetMonth(string dt)
         {
-            string temp = "";
+            string temp = string.Empty;
             int i = 0;
-            while (dt[i] != '/')
+            while (i < dt.Length && dt[i] != '/')
             {
                 temp += dt[i];
                 i++;
             }
+
             return temp;
         }
-        bool isLapYear(int nInput)
+
+        private bool isFloat(string s)
         {
-            if ((nInput % 4 == 0 && nInput % 100 != 0) || nInput % 400 == 0)
+            if (string.IsNullOrWhiteSpace(s))
             {
-                return true;
+                return false;
             }
-            return false;
-        }
-        bool isFloat(string s)
-        {
+
             if (s[0] < 48 || s[0] > 57) return false;
             if (s[s.Length - 1] < 48 || s[s.Length - 1] > 57) return false;
             int count = 0;
@@ -423,24 +321,9 @@ namespace QuanLyNhaHang.ViewModel
                 if ((s[i] < 48 || s[i] > 57) && s[i] != '.') return false;
                 i++;
             }
+
             if (count > 1) return false;
             return true;
-        }
-        private void OpenConnect()
-        {
-            sqlCon = new SqlConnection(strCon);
-            if (sqlCon.State == ConnectionState.Closed)
-            {
-                sqlCon.Open();
-            }
-        }
-
-        private void CloseConnect()
-        {
-            if (sqlCon.State == ConnectionState.Open)
-            {
-                sqlCon.Close();
-            }
         }
     }
 }

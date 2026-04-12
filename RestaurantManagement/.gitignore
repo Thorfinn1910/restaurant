@@ -1,0 +1,19 @@
+# Build outputs
+bin/
+obj/
+build_out/
+
+# Local .NET CLI home/cache created during local builds
+.dotnet_home/
+
+# IDE / user-local files
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Logs / temp
+*.log
+*.tmp
+*.temp

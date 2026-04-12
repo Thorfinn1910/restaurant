@@ -33,7 +33,6 @@ namespace QuanLyNhaHang.ViewModel
             LoadMenu();
             Tables = MenuDP.Flag.GetTables();
             Kho = MenuDP.Flag.GetIngredients();
-            _selectedIngredientsName = new ObservableCollection<string>();
             _menuItemsView = new CollectionViewSource();
             _menuItemsView.Source = MenuItems;
             _menuItemsView.Filter += MenuItems_Filter;
@@ -72,12 +71,11 @@ namespace QuanLyNhaHang.ViewModel
                 }
 
                 string mess = "";
-                string tennl = String.Empty;
                 try
                 {
                     if (SelectedTable != null)
                     {
-                        HasEnoughIngredients();
+                        MenuDP.IngredientAvailabilityResult availability = MenuDP.Flag.CheckIngredientAvailability(SelectedItems);
                         if (SelectedTable.Status == 0)
                         {
                             MyMessageBox typeOfCustomerAnnouncement = new MyMessageBox("Bạn muốn order cho khách mới?", true);
@@ -88,43 +86,29 @@ namespace QuanLyNhaHang.ViewModel
                                 return;
                             }
                         }
-                        if (_sumIngredients.Count == 0)
+                        if (availability.HasMissingRecipe)
                         {
                             mess = "Hãy thêm thông tin nguyên liệu cho món!";
                             return;
-                        }            
-                        if (_selectedIngredientsName.Count > 0)
+                        }
+
+                        if (availability.HasInsufficientIngredient)
                         {
-                            tennl += $"{_selectedIngredientsName[0]}";
-                            if (_selectedIngredientsName.Count > 1)
-                            {
-                                for (int i = 1; i < _selectedIngredientsName.Count; i++)
-                                {
-                                    tennl += $" , {_selectedIngredientsName[i]}";
-                                }
-                            }
+                            string tennl = string.Join(" , ", availability.InsufficientIngredients);
                             mess = $"Không đủ nguyên liệu ({tennl}). Hãy nhập thêm!";
                             return;
                         }
-                        foreach (SelectedMenuItem orderDish in SelectedItems)
-                        {
-                            MenuDP.Flag.InformChef(orderDish.ID, Convert.ToInt32(SelectedTable.NumOfTable), orderDish.Quantity);
-                        }
-                        //FILL CTHD AFTER INFORM CHEF ORDERED DISHES
-                        //FIX AFTER 
+
                         MaNV = getMaNV();
-                        MenuDP.Flag.PayABill(Convert.ToInt16(SelectedTable.NumOfTable), DecSubtotal, MaNV);
-                        foreach (SelectedMenuItem orderdish in SelectedItems)
-                        {
-                            MenuDP.Flag.Fill_CTHD(orderdish.ID, orderdish.Quantity);
-                        }
+                        int soBan = Convert.ToInt32(SelectedTable.NumOfTable);
+                        MenuDP.Flag.CreateOpenOrderTransactional(soBan, MaNV, SelectedItems);
+
                         mess = "Đã báo chế biến thành công!";
                         SelectedItems.Clear();
                         DecSubtotal = 0;
                         StrSubtotal = "0 VND";
-                        _selectedIngredientsName.Clear();
-                        _sumIngredients.Clear();
                         Tables = MenuDP.Flag.GetTables();
+                        Kho = MenuDP.Flag.GetIngredients();
                     }
                     else if (SelectedTable == null)
                     {
@@ -138,8 +122,11 @@ namespace QuanLyNhaHang.ViewModel
                 }
                 finally
                 {
-                    MyMessageBox ms = new MyMessageBox(mess);
-                    ms.Show();
+                    if (!string.IsNullOrWhiteSpace(mess))
+                    {
+                        MyMessageBox ms = new MyMessageBox(mess);
+                        ms.Show();
+                    }
                 }
             });
             LoadOpenOrderForSelectedTable_Command = new RelayCommand<object>((p) => SelectedTable != null, (p) => LoadOpenOrderForSelectedTable());
@@ -151,21 +138,19 @@ namespace QuanLyNhaHang.ViewModel
         }
           
         #region attributes
-        private ObservableCollection<MenuItem> _menuItems;
-        private ObservableCollection<SelectedMenuItem> _selectedItems;
-        private ObservableCollection<Table> _tables;
-        private ObservableCollection<ChiTietMon> _ingredients;
-        private ObservableCollection<ChiTietMon> _sumIngredients;
-        private ObservableCollection<Models.Kho> _kho;
-        private ObservableCollection<string> _selectedIngredientsName;
-        private Table _selectedTable;
-        private ObservableCollection<string> _comboBox_2Items;
-        private CollectionViewSource _menuItemsView;
+        private ObservableCollection<MenuItem> _menuItems = new ObservableCollection<MenuItem>();
+        private ObservableCollection<SelectedMenuItem> _selectedItems = new ObservableCollection<SelectedMenuItem>();
+        private ObservableCollection<Table> _tables = new ObservableCollection<Table>();
+        private ObservableCollection<ChiTietMon> _ingredients = new ObservableCollection<ChiTietMon>();
+        private ObservableCollection<Models.Kho> _kho = new ObservableCollection<Models.Kho>();
+        private Table _selectedTable = new Table();
+        private ObservableCollection<string> _comboBox_2Items = new ObservableCollection<string>();
+        private CollectionViewSource _menuItemsView = new CollectionViewSource();
         private string myComboboxSelection = "A -> Z";
         private decimal dec_subtotal = 0;
         private string str_subtotal = "0 VND";
-        private string _searchText;
-        private string MaNV;
+        private string _searchText = string.Empty;
+        private string MaNV = string.Empty;
         private int _currentOpenOrderId = 0;
         private bool _isEditOrderMode = false;
         private bool _isLoadingOrder = false;
@@ -257,7 +242,7 @@ namespace QuanLyNhaHang.ViewModel
         public ICommand SortingFeature_Command { get; set; }
         public ICommand ClearAllSelectedDishes { get; set; }
         public ICommand Inform_Chef_Of_OrderedDishes { get; set; }
-        public ICommand SwitchCustomerTable { get; set; }
+        public ICommand SwitchCustomerTable { get; set; } = null!;
         public ICommand LoadOpenOrderForSelectedTable_Command { get; set; }
         public ICommand CancelOrderEditing_Command { get; set; }
         #endregion
@@ -279,7 +264,7 @@ namespace QuanLyNhaHang.ViewModel
             {
                 if (item.ID == ID)
                 {
-                    SelectedMenuItem x = checkIfAnItemIsInOrderItems(ID);
+                    SelectedMenuItem? x = checkIfAnItemIsInOrderItems(ID);
                     if (x != null)
                     {
                         x.Quantity++;
@@ -425,7 +410,7 @@ namespace QuanLyNhaHang.ViewModel
         #endregion
 
         #region complementary methods
-        private SelectedMenuItem checkIfAnItemIsInOrderItems(string ID)
+        private SelectedMenuItem? checkIfAnItemIsInOrderItems(string ID)
         {
             foreach (SelectedMenuItem item in _selectedItems)
             {
@@ -444,7 +429,12 @@ namespace QuanLyNhaHang.ViewModel
                 return;
             }
 
-            Models.MenuItem item = e.Item as Models.MenuItem;
+            if (e.Item is not Models.MenuItem item)
+            {
+                e.Accepted = false;
+                return;
+            }
+
             if (item.FoodName.RemoveDiacritics().ToLower().Contains(SearchText.RemoveDiacritics().ToLower()))
             {
                 e.Accepted = true;
@@ -477,43 +467,6 @@ namespace QuanLyNhaHang.ViewModel
             StrSubtotal = String.Format("{0:0,0 VND}", DecSubtotal);
         }
 
-        private void HasEnoughIngredients()
-        {
-            Models.Kho x = null;
-            _sumIngredients = MenuDP.Flag.getSumIngredients(SelectedItems);
-            foreach (SelectedMenuItem item in SelectedItems)
-            {
-                foreach (ChiTietMon ctm in _sumIngredients)
-                {
-                    x = getKhoItem(ctm.TenNL);
-                    if (x.TonDu - ctm.SoLuong * item.Quantity < 0)
-                    {
-                        if(!_selectedIngredientsName.Contains(ctm.TenNL))
-                        {
-                            _selectedIngredientsName.Add(ctm.TenNL);
-                        }
-                    }
-                }
-            }
-        }
-
-        private Models.Kho getKhoItem(string tensp) {
-            Models.Kho item = null;
-            try
-            {
-                foreach (Models.Kho x in Kho)
-                {
-                    if (String.Compare(x.TenSanPham, tensp) == 0)
-                    {
-                        item = x; break;
-                    }
-                }
-            } catch(Exception ex)
-            {
-                
-            }
-            return item;
-        }
         #endregion
     }
 }
