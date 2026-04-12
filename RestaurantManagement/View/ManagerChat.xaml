@@ -1,0 +1,179 @@
+<UserControl x:Class="QuanLyNhaHang.View.ManagerChat"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:fa="http://schemas.awesome.incremented/wpf/xaml/fontawesome.sharp"
+             xmlns:vm="clr-namespace:QuanLyNhaHang.ViewModel"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+             mc:Ignorable="d"
+             d:DesignHeight="700"
+             d:DesignWidth="1100"
+             Background="#F4F6F9"
+             TextElement.FontFamily="Comfortaa">
+
+    <UserControl.DataContext>
+        <vm:ManagerChatViewModel x:Name="vm"/>
+    </UserControl.DataContext>
+
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+    </UserControl.Resources>
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Background="White" CornerRadius="12" Padding="20" Margin="0 0 0 15">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="15" ShadowDepth="2" Opacity="0.08" Color="#000000"/>
+            </Border.Effect>
+
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border Width="48" Height="48" CornerRadius="24" Background="#E0E7FF">
+                        <fa:IconImage Icon="Comments" Width="24" Height="24" Foreground="#1C3879"/>
+                    </Border>
+                    <StackPanel Margin="12 0 0 0">
+                        <TextBlock Text="Chatbot Manager (Mock)" FontSize="20" FontWeight="Bold" Foreground="#1E293B"/>
+                        <TextBlock Text="Hỏi nhanh: doanh thu, top món, tồn kho, chấm công, tình trạng bàn." FontSize="13" Foreground="#64748B"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <Button Grid.Column="1"
+                        Command="{Binding ClearChatCommand}"
+                        Background="White"
+                        Foreground="#EF4444"
+                        BorderBrush="#EF4444"
+                        BorderThickness="1"
+                        Height="38"
+                        Padding="14 0"
+                        Cursor="Hand"
+                        materialDesign:ButtonAssist.CornerRadius="8">
+                    <StackPanel Orientation="Horizontal">
+                        <fa:IconImage Icon="TrashCan" Width="13" Height="13" Foreground="#EF4444" Margin="0 0 6 0"/>
+                        <TextBlock Text="Xóa hội thoại" FontWeight="SemiBold"/>
+                    </StackPanel>
+                </Button>
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="1" Background="White" CornerRadius="12" Padding="15">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="15" ShadowDepth="2" Opacity="0.08" Color="#000000"/>
+            </Border.Effect>
+
+            <Grid>
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <ItemsControl ItemsSource="{Binding Messages}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Margin="0 0 0 12">
+                                    <Border x:Name="Bubble"
+                                            Background="#F8FAFC"
+                                            BorderBrush="#E2E8F0"
+                                            BorderThickness="1"
+                                            CornerRadius="12"
+                                            Padding="12 10"
+                                            MaxWidth="750"
+                                            HorizontalAlignment="Left">
+                                        <StackPanel>
+                                            <TextBlock x:Name="MessageText" Text="{Binding Text}" TextWrapping="Wrap" Foreground="#1E293B" FontSize="14"/>
+                                            <TextBlock x:Name="IntentText"
+                                                       Text="{Binding IntentTag}"
+                                                       Margin="0 6 0 0"
+                                                       FontSize="10"
+                                                       Foreground="#64748B"/>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <TextBlock x:Name="TimeText"
+                                               Text="{Binding Timestamp, StringFormat='{}{0:HH:mm:ss}'}"
+                                               FontSize="11"
+                                               Foreground="#94A3B8"
+                                               Margin="6 4 6 0"
+                                               HorizontalAlignment="Left"/>
+                                </StackPanel>
+
+                                <DataTemplate.Triggers>
+                                    <DataTrigger Binding="{Binding IsFromUser}" Value="True">
+                                        <Setter TargetName="Bubble" Property="HorizontalAlignment" Value="Right"/>
+                                        <Setter TargetName="Bubble" Property="Background" Value="#1C3879"/>
+                                        <Setter TargetName="Bubble" Property="BorderBrush" Value="#1C3879"/>
+                                        <Setter TargetName="MessageText" Property="Foreground" Value="White"/>
+                                        <Setter TargetName="IntentText" Property="Text" Value="user"/>
+                                        <Setter TargetName="IntentText" Property="Foreground" Value="#CBD5E1"/>
+                                        <Setter TargetName="TimeText" Property="HorizontalAlignment" Value="Right"/>
+                                    </DataTrigger>
+                                </DataTemplate.Triggers>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+
+                <Border HorizontalAlignment="Right"
+                        VerticalAlignment="Bottom"
+                        Margin="0 0 10 10"
+                        Padding="10 6"
+                        CornerRadius="10"
+                        Background="#EFF6FF"
+                        Visibility="{Binding IsProcessing, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <StackPanel Orientation="Horizontal">
+                        <fa:IconImage Icon="Spinner" Width="12" Height="12" Foreground="#2563EB" Margin="0 0 6 0"/>
+                        <TextBlock Text="Đang trả lời..." Foreground="#2563EB" FontSize="12" FontWeight="SemiBold"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="2" Background="White" CornerRadius="12" Padding="12" Margin="0 15 0 0">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="15" ShadowDepth="2" Opacity="0.08" Color="#000000"/>
+            </Border.Effect>
+
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="12"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBox Grid.Column="0"
+                         Text="{Binding CurrentQuestion, UpdateSourceTrigger=PropertyChanged}"
+                         materialDesign:HintAssist.Hint="Nhập câu hỏi quản lý..."
+                         Style="{StaticResource MaterialDesignTextBox}"
+                         FontSize="15"
+                         Height="42"
+                         VerticalContentAlignment="Center"
+                         Padding="12 0">
+                    <TextBox.InputBindings>
+                        <KeyBinding Key="Enter" Command="{Binding SendMessageCommand}"/>
+                    </TextBox.InputBindings>
+                </TextBox>
+
+                <Button Grid.Column="2"
+                        Command="{Binding SendMessageCommand}"
+                        Background="#1C3879"
+                        Foreground="White"
+                        BorderThickness="0"
+                        Height="42"
+                        Width="120"
+                        Cursor="Hand"
+                        materialDesign:ButtonAssist.CornerRadius="8">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <fa:IconImage Icon="PaperPlane" Width="14" Height="14" Foreground="White" Margin="0 0 8 0"/>
+                        <TextBlock Text="Gửi" FontWeight="Bold" FontSize="14"/>
+                    </StackPanel>
+                </Button>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

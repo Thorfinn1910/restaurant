@@ -20,6 +20,7 @@ namespace QuanLyNhaHang.State.Navigator
         CaiDat,
         DangXuat,
         ThongKe,
+        ManagerChat,
         Bep
     }
     public interface INavigator

@@ -78,6 +78,10 @@ namespace QuanLyNhaHang.Command
                         _navigator1.CurrentTitle = "Bếp";
                         _navigator.CurrentViewModel = new BepViewModel();
                         break;
+                    case TypeOfView.ManagerChat:
+                        _navigator1.CurrentTitle = "Chatbot Manager";
+                        _navigator.CurrentViewModel = new ManagerChatViewModel();
+                        break;
                     default:
                         break;
                 }

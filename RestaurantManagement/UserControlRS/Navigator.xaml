@@ -140,6 +140,14 @@
                         <TextBlock Text="Thống Kê" Style="{StaticResource sideBarRadioButtonText}" />
                     </StackPanel>
                 </RadioButton>
+
+                <RadioButton Style="{StaticResource sidebarRadioButton}" 
+                             Command="{Binding SelectViewModelCommand}" CommandParameter="{x:Static nav:TypeOfView.ManagerChat}">
+                    <StackPanel Orientation="Horizontal">
+                        <fa:IconImage Icon="Comments" Style="{StaticResource sidebarRadioButtonIcon}" />
+                        <TextBlock Text="Chatbot Manager" Style="{StaticResource sideBarRadioButtonText}" />
+                    </StackPanel>
+                </RadioButton>
             </StackPanel>
         </ScrollViewer>
     </Grid>
