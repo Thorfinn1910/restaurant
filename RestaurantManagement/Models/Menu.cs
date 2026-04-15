@@ -72,17 +72,19 @@ namespace QuanLyNhaHang.Models
             }
             set
             {
-                if (!IsNumber(value))
+                if (string.IsNullOrWhiteSpace(value))
                 {
                     Price = 0;
                 }
-                else
+                else if (decimal.TryParse(value, out decimal result))
                 {
-                    Price = Convert.ToDecimal(value);
+                    Price = result;
                 }
+
                 OnPropertyChanged();
             }
         }
+
         public string Str_CookingTime
         {
             get
@@ -91,14 +93,15 @@ namespace QuanLyNhaHang.Models
             }
             set
             {
-                if (!IsNumber(value))
+                if (string.IsNullOrWhiteSpace(value))
                 {
                     CookingTime = 0;
                 }
-                else
+                else if (int.TryParse(value, out int result))
                 {
-                    CookingTime = Convert.ToInt32(value);
+                    CookingTime = result;
                 }
+
                 OnPropertyChanged();
             }
         }

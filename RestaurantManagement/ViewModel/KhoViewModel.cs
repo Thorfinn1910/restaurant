@@ -12,6 +12,8 @@ using System.Data;
 using System.Data.SqlClient;
 using System.Globalization;
 using System.IO;
+using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Windows.Forms;
 using System.Windows.Input;
 
@@ -21,9 +23,9 @@ namespace QuanLyNhaHang.ViewModel
     {
         public enum StockFormMode
         {
-            NewIngredient,
-            StockIn,
-            EditStockIn
+            NewIngredient = 0,
+            StockIn = 1,
+            EditStockIn = 2
         }
 
         private ObservableCollection<Kho> _listWareHouse;
@@ -43,6 +45,11 @@ namespace QuanLyNhaHang.ViewModel
             get => _selected;
             set
             {
+                if (_selected == value)
+                {
+                    return;
+                }
+
                 _selected = value;
                 OnPropertyChanged();
 
@@ -50,24 +57,26 @@ namespace QuanLyNhaHang.ViewModel
                 {
                     ListIn.Clear();
                     SelectedInputHistory = null;
-                    if (CurrentStockFormMode == StockFormMode.EditStockIn)
+                    if (CurrentStockFormMode != StockFormMode.NewIngredient)
                     {
-                        SetFormMode(StockFormMode.StockIn);
+                        ResetStockForm(false, true);
                     }
-                    ResetStockForm(false, true);
+                    CommandManager.InvalidateRequerySuggested();
                     return;
                 }
 
                 GetInputInfo(_selected.TenSanPham);
-                if (CurrentStockFormMode == StockFormMode.NewIngredient)
+                if (CurrentStockFormMode == StockFormMode.StockIn)
                 {
-                    SetFormMode(StockFormMode.StockIn);
+                    ResetStockForm(true, true);
+                    PrefillStockInFromLatestHistory();
                 }
-                if (CurrentStockFormMode == StockFormMode.EditStockIn)
+                else if (CurrentStockFormMode == StockFormMode.EditStockIn)
                 {
-                    SetFormMode(StockFormMode.StockIn);
+                    ResetStockForm(true, true);
                 }
-                ResetStockForm(CurrentStockFormMode != StockFormMode.NewIngredient, true);
+
+                CommandManager.InvalidateRequerySuggested();
             }
         }
 
@@ -99,17 +108,10 @@ namespace QuanLyNhaHang.ViewModel
 
                 if (_selectedInputHistory != null)
                 {
-                    if (!CanSelectHistory)
-                    {
-                        return;
-                    }
-                    SetFormMode(StockFormMode.EditStockIn);
                     FillFormFromHistory(_selectedInputHistory);
                 }
-                else if (CurrentStockFormMode == StockFormMode.EditStockIn)
-                {
-                    SetFormMode(StockFormMode.StockIn);
-                }
+
+                CommandManager.InvalidateRequerySuggested();
             }
         }
 
@@ -121,55 +123,94 @@ namespace QuanLyNhaHang.ViewModel
             {
                 _currentStockFormMode = value;
                 OnPropertyChanged();
-                OnPropertyChanged(nameof(CurrentStockFormModeKey));
-                OnPropertyChanged(nameof(CurrentStockFormModeDescription));
+                OnPropertyChanged(nameof(CurrentStockTabIndex));
                 OnPropertyChanged(nameof(IsNewIngredientMode));
+                OnPropertyChanged(nameof(IsStockInMode));
+                OnPropertyChanged(nameof(IsEditStockInMode));
+                OnPropertyChanged(nameof(IsNameReadOnly));
+                OnPropertyChanged(nameof(IsIdReadOnly));
                 OnPropertyChanged(nameof(CanSelectHistory));
                 OnPropertyChanged(nameof(CanEditHistory));
             }
         }
 
-        public string CurrentStockFormModeKey => CurrentStockFormMode switch
+        public int CurrentStockTabIndex
         {
-            StockFormMode.NewIngredient => "NEW_INGREDIENT_MODE",
-            StockFormMode.EditStockIn => "EDIT_STOCK_IN_MODE",
-            _ => "STOCK_IN_MODE"
-        };
+            get => (int)CurrentStockFormMode;
+            set
+            {
+                if (!Enum.IsDefined(typeof(StockFormMode), value))
+                {
+                    return;
+                }
 
-        public string CurrentStockFormModeDescription => CurrentStockFormMode switch
-        {
-            StockFormMode.NewIngredient => "Đang tạo nguyên liệu mới. Chỉ tạo nguyên liệu chưa tồn tại.",
-            StockFormMode.EditStockIn => "Đang sửa phiếu nhập đã chọn.",
-            _ => "Đang nhập bổ sung kho. Hỗ trợ nguyên liệu mới hoặc đã có."
-        };
+                SetFormMode((StockFormMode)value);
+            }
+        }
 
         public bool IsNewIngredientMode => CurrentStockFormMode == StockFormMode.NewIngredient;
-        public bool CanSelectHistory => !IsNewIngredientMode;
-        public bool CanEditHistory => !IsNewIngredientMode && SelectedInputHistory != null;
+        public bool IsStockInMode => CurrentStockFormMode == StockFormMode.StockIn;
+        public bool IsEditStockInMode => CurrentStockFormMode == StockFormMode.EditStockIn;
+        public bool IsNameReadOnly => !IsNewIngredientMode;
+        public bool IsIdReadOnly => IsEditStockInMode;
+        public bool CanSelectHistory => IsEditStockInMode;
+        public bool CanEditHistory => IsEditStockInMode && SelectedInputHistory != null;
 
         private string _id;
-        public string ID { get => _id; set { _id = value; OnPropertyChanged(); } }
+        public string ID
+        {
+            get => _id;
+            set => SetFormField(ref _id, value);
+        }
 
         private string _name;
-        public string Name { get => _name; set { _name = value; OnPropertyChanged(); } }
+        public string Name
+        {
+            get => _name;
+            set => SetFormField(ref _name, value);
+        }
 
         private string _count;
-        public string Count { get => _count; set { _count = value; OnPropertyChanged(); } }
+        public string Count
+        {
+            get => _count;
+            set => SetFormField(ref _count, value);
+        }
 
         private string _unit;
-        public string Unit { get => _unit; set { _unit = value; OnPropertyChanged(); } }
+        public string Unit
+        {
+            get => _unit;
+            set => SetFormField(ref _unit, value);
+        }
 
         private string _value;
-        public string Value { get => _value; set { _value = value; OnPropertyChanged(); } }
+        public string Value
+        {
+            get => _value;
+            set => SetFormField(ref _value, value);
+        }
 
         private string _dateIn;
-        public string DateIn { get => _dateIn; set { _dateIn = value; OnPropertyChanged(); } }
+        public string DateIn
+        {
+            get => _dateIn;
+            set => SetFormField(ref _dateIn, value);
+        }
 
         private string _suplier;
-        public string Suplier { get => _suplier; set { _suplier = value; OnPropertyChanged(); } }
+        public string Suplier
+        {
+            get => _suplier;
+            set => SetFormField(ref _suplier, value);
+        }
 
         private string _suplierInfo;
-        public string SuplierInfo { get => _suplierInfo; set { _suplierInfo = value; OnPropertyChanged(); } }
+        public string SuplierInfo
+        {
+            get => _suplierInfo;
+            set => SetFormField(ref _suplierInfo, value);
+        }
 
         private string _search;
         public string Search
@@ -197,62 +238,250 @@ namespace QuanLyNhaHang.ViewModel
             ListWareHouse = new ObservableCollection<Kho>();
             ListIn = new ObservableCollection<NhapKho>();
 
-            SetFormMode(StockFormMode.StockIn);
+            SetFormMode(StockFormMode.StockIn, false);
             ResetStockForm(false, true);
             RefreshWarehouseList();
 
-            CreateNewIngredientCM = new RelayCommand<object>((p) => true, (p) => EnterNewIngredientMode());
-            AddCM = new RelayCommand<object>((p) => CanSubmitStockIn(), (p) => AddStockInEntry());
-            EditCM = new RelayCommand<object>((p) => CanEditStockIn(), (p) => EditStockInEntry());
+            CreateNewIngredientCM = new RelayCommand<object>((p) => true, (p) => SetFormMode(StockFormMode.NewIngredient));
+            AddCM = new RelayCommand<object>((p) => CanCreateStockEntry(), (p) => AddStockInEntry());
+            EditCM = new RelayCommand<object>((p) => CanUpdateStockEntry(), (p) => EditStockInEntry());
             DeleteCM = new RelayCommand<object>((p) => Selected != null, (p) => DeleteWarehouseItem());
             CheckCM = new RelayCommand<object>((p) => ListWareHouse != null, (p) => CheckLowStockAndExportPdf());
         }
 
-        private void SetFormMode(StockFormMode mode)
+        private void SetFormField(ref string backingField, string value, [CallerMemberName] string propertyName = "")
         {
-            CurrentStockFormMode = mode;
+            if (string.Equals(backingField, value, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            backingField = value;
+            OnPropertyChanged(propertyName);
+            CommandManager.InvalidateRequerySuggested();
         }
 
-        private void EnterNewIngredientMode()
+        private void SetFormMode(StockFormMode mode, bool resetByMode = true)
         {
-            SetFormMode(StockFormMode.NewIngredient);
-            ResetStockForm(false, true);
+            bool modeChanged = CurrentStockFormMode != mode;
+            if (modeChanged)
+            {
+                CurrentStockFormMode = mode;
+            }
+
+            if (!resetByMode)
+            {
+                CommandManager.InvalidateRequerySuggested();
+                return;
+            }
+
+            if (mode == StockFormMode.NewIngredient)
+            {
+                SelectedInputHistory = null;
+                ResetStockForm(false, true);
+            }
+            else if (mode == StockFormMode.StockIn)
+            {
+                SelectedInputHistory = null;
+                ResetStockForm(Selected != null, true);
+                PrefillStockInFromLatestHistory();
+            }
+            else
+            {
+                ResetStockForm(Selected != null, false);
+            }
+
+            CommandManager.InvalidateRequerySuggested();
         }
 
-        private bool CanSubmitStockIn()
+        private void PrefillStockInFromLatestHistory()
         {
-            return !string.IsNullOrWhiteSpace(ID)
-                && !string.IsNullOrWhiteSpace(Name)
-                && !string.IsNullOrWhiteSpace(Count)
-                && !string.IsNullOrWhiteSpace(Unit)
-                && !string.IsNullOrWhiteSpace(Value)
-                && !string.IsNullOrWhiteSpace(DateIn);
+            if (!IsStockInMode || ListIn.Count == 0)
+            {
+                return;
+            }
+
+            NhapKho latestInput = ListIn[0];
+            Unit = latestInput.DonVi;
+            Value = latestInput.DonGia;
+            Suplier = latestInput.NguonNhap;
+            SuplierInfo = latestInput.LienLac;
         }
 
-        private bool CanEditStockIn()
+        private bool WarehouseContainsProduct(string productName)
         {
-            return CanEditHistory && CanSubmitStockIn();
+            return ListWareHouse.Any(x => string.Equals(x.TenSanPham, productName, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private List<string> CollectCommonInputErrors()
+        {
+            List<string> errors = new List<string>();
+
+            string stockInId = (ID ?? string.Empty).Trim();
+            string productName = (Name ?? string.Empty).Trim();
+            string quantityText = (Count ?? string.Empty).Trim();
+            string unitText = (Unit ?? string.Empty).Trim();
+            string unitPriceText = (Value ?? string.Empty).Trim();
+            string dateText = (DateIn ?? string.Empty).Trim();
+            string supplierContactText = (SuplierInfo ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(stockInId))
+            {
+                errors.Add("Mã nhập là bắt buộc.");
+            }
+
+            if (string.IsNullOrWhiteSpace(productName))
+            {
+                errors.Add("Tên sản phẩm là bắt buộc.");
+            }
+
+            if (string.IsNullOrWhiteSpace(quantityText))
+            {
+                errors.Add("Số lượng là bắt buộc.");
+            }
+            else if (!TryParsePositiveDouble(quantityText, out _))
+            {
+                errors.Add("Số lượng phải lớn hơn 0.");
+            }
+
+            if (string.IsNullOrWhiteSpace(unitText))
+            {
+                errors.Add("Đơn vị là bắt buộc.");
+            }
+
+            if (string.IsNullOrWhiteSpace(unitPriceText))
+            {
+                errors.Add("Đơn giá là bắt buộc.");
+            }
+            else if (!TryParsePositiveDecimal(unitPriceText, out _))
+            {
+                errors.Add("Đơn giá phải lớn hơn 0.");
+            }
+
+            if (string.IsNullOrWhiteSpace(dateText))
+            {
+                errors.Add("Ngày nhập là bắt buộc.");
+            }
+            else if (!DateTime.TryParse(dateText, CultureInfo.CurrentCulture, DateTimeStyles.None, out _)
+                     && !DateTime.TryParse(dateText, CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
+            {
+                errors.Add("Ngày nhập không hợp lệ.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(supplierContactText) && !isNumber(supplierContactText))
+            {
+                errors.Add("Liên lạc chỉ được chứa chữ số.");
+            }
+
+            return errors;
+        }
+
+        private List<string> CollectCreateErrors()
+        {
+            List<string> errors = CollectCommonInputErrors();
+            string stockInId = (ID ?? string.Empty).Trim();
+            string productName = (Name ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(stockInId) == false && KhoDP.Flag.ExistsStockInId(stockInId))
+            {
+                errors.Add("Mã nhập đã tồn tại.");
+            }
+
+            if (IsNewIngredientMode)
+            {
+                if (!string.IsNullOrWhiteSpace(productName)
+                    && (WarehouseContainsProduct(productName) || KhoDP.Flag.ExistsWarehouseProduct(productName)))
+                {
+                    errors.Add("Nguyên liệu đã tồn tại. Hãy dùng tab 'Nhập bổ sung'.");
+                }
+            }
+            else if (IsStockInMode)
+            {
+                if (Selected == null)
+                {
+                    errors.Add("Chọn nguyên liệu ở danh sách bên trái trước khi nhập bổ sung.");
+                }
+                else if (!string.Equals(productName, Selected.TenSanPham, StringComparison.OrdinalIgnoreCase))
+                {
+                    errors.Add("Tên sản phẩm phải trùng nguyên liệu đã chọn.");
+                }
+            }
+            else
+            {
+                errors.Add("Chỉ có thể tạo phiếu mới trong tab Nguyên liệu mới hoặc Nhập bổ sung.");
+            }
+
+            return errors;
+        }
+
+        private List<string> CollectEditErrors()
+        {
+            List<string> errors = CollectCommonInputErrors();
+            string stockInId = (ID ?? string.Empty).Trim();
+            string productName = (Name ?? string.Empty).Trim();
+
+            if (!IsEditStockInMode)
+            {
+                errors.Add("Chỉ được sửa phiếu trong tab Sửa phiếu.");
+                return errors;
+            }
+
+            if (SelectedInputHistory == null)
+            {
+                errors.Add("Vui lòng chọn phiếu nhập cần sửa.");
+                return errors;
+            }
+
+            if (!string.Equals(stockInId, SelectedInputHistory.MaNhap, StringComparison.OrdinalIgnoreCase))
+            {
+                errors.Add("Không được sửa mã nhập.");
+            }
+
+            if (!string.Equals(productName, SelectedInputHistory.TenSP, StringComparison.OrdinalIgnoreCase))
+            {
+                errors.Add("Không được sửa tên sản phẩm.");
+            }
+
+            return errors;
+        }
+
+        private void ShowValidationSummary(IEnumerable<string> errors, string title)
+        {
+            List<string> lines = errors
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct()
+                .ToList();
+
+            if (lines.Count == 0)
+            {
+                return;
+            }
+
+            ShowMessage(title + "\n- " + string.Join("\n- ", lines));
+        }
+
+        private bool CanCreateStockEntry()
+        {
+            return IsNewIngredientMode || IsStockInMode;
+        }
+
+        private bool CanUpdateStockEntry()
+        {
+            return IsEditStockInMode;
         }
 
         private void AddStockInEntry()
         {
-            bool isNewIngredientMode = IsNewIngredientMode;
-
-            if (!TryBuildInput(out StockInEntryInput input, out string errorMessage))
+            List<string> errors = CollectCreateErrors();
+            if (errors.Count > 0)
             {
-                ShowMessage(errorMessage);
+                ShowValidationSummary(errors, "Không thể lưu phiếu nhập. Vui lòng sửa các lỗi:");
                 return;
             }
 
-            if (KhoDP.Flag.ExistsStockInId(input.StockInId))
+            if (!TryBuildInput(out StockInEntryInput input))
             {
-                ShowMessage("Mã nhập đã tồn tại!");
-                return;
-            }
-
-            if (isNewIngredientMode && KhoDP.Flag.ExistsWarehouseProduct(input.ProductName))
-            {
-                ShowMessage("Nguyên liệu đã có trong kho, vui lòng dùng 'THÊM PHIẾU NHẬP'.");
+                ShowMessage("Dữ liệu nhập không hợp lệ.");
                 return;
             }
 
@@ -261,18 +490,19 @@ namespace QuanLyNhaHang.ViewModel
                 KhoDP.Flag.CreateStockInEntry(input);
                 ShowMessage("Nhập thành công!");
 
+                string? selectedName = IsNewIngredientMode ? null : Selected?.TenSanPham;
                 RefreshWarehouseList();
-                GetInputInfo(input.ProductName);
+                RestoreSelectedByName(selectedName ?? input.ProductName);
 
-                if (isNewIngredientMode)
+                if (IsNewIngredientMode)
                 {
-                    SetFormMode(StockFormMode.NewIngredient);
                     ResetStockForm(false, true);
                 }
                 else
                 {
-                    SetFormMode(StockFormMode.StockIn);
+                    GetInputInfo(input.ProductName);
                     ResetStockForm(true, true);
+                    PrefillStockInFromLatestHistory();
                 }
             }
             catch (InvalidOperationException ex)
@@ -287,39 +517,29 @@ namespace QuanLyNhaHang.ViewModel
 
         private void EditStockInEntry()
         {
-            if (SelectedInputHistory == null)
+            List<string> errors = CollectEditErrors();
+            if (errors.Count > 0)
             {
-                ShowMessage("Vui lòng chọn một phiếu nhập gần đây để sửa.");
+                ShowValidationSummary(errors, "Không thể sửa phiếu nhập. Vui lòng sửa các lỗi:");
                 return;
             }
 
-            if (!TryBuildInput(out StockInEntryInput input, out string errorMessage))
+            if (!TryBuildInput(out StockInEntryInput input))
             {
-                ShowMessage(errorMessage);
-                return;
-            }
-
-            if (!string.Equals(input.StockInId, SelectedInputHistory.MaNhap, StringComparison.OrdinalIgnoreCase))
-            {
-                ShowMessage("Không được sửa Mã nhập!");
-                return;
-            }
-
-            if (!string.Equals(input.ProductName, SelectedInputHistory.TenSP, StringComparison.OrdinalIgnoreCase))
-            {
-                ShowMessage("Không được sửa Tên sản phẩm!");
+                ShowMessage("Dữ liệu nhập không hợp lệ.");
                 return;
             }
 
             try
             {
-                KhoDP.Flag.UpdateStockInEntry(SelectedInputHistory.MaNhap, input);
+                KhoDP.Flag.UpdateStockInEntry(SelectedInputHistory!.MaNhap, input);
                 ShowMessage("Sửa thành công!");
 
+                string selectedName = input.ProductName;
                 RefreshWarehouseList();
-                GetInputInfo(input.ProductName);
-                SetFormMode(StockFormMode.StockIn);
-                ResetStockForm(true, true);
+                RestoreSelectedByName(selectedName);
+                GetInputInfo(selectedName);
+                SelectedInputHistory = ListIn.FirstOrDefault(x => string.Equals(x.MaNhap, input.StockInId, StringComparison.OrdinalIgnoreCase));
             }
             catch (InvalidOperationException ex)
             {
@@ -331,10 +551,9 @@ namespace QuanLyNhaHang.ViewModel
             }
         }
 
-        private bool TryBuildInput(out StockInEntryInput input, out string errorMessage)
+        private bool TryBuildInput(out StockInEntryInput input)
         {
             input = new StockInEntryInput();
-            errorMessage = string.Empty;
 
             string stockInId = (ID ?? string.Empty).Trim();
             string productName = (Name ?? string.Empty).Trim();
@@ -345,39 +564,11 @@ namespace QuanLyNhaHang.ViewModel
             string supplierText = (Suplier ?? string.Empty).Trim();
             string supplierContactText = (SuplierInfo ?? string.Empty).Trim();
 
-            if (string.IsNullOrWhiteSpace(stockInId)
-                || string.IsNullOrWhiteSpace(productName)
-                || string.IsNullOrWhiteSpace(quantityText)
-                || string.IsNullOrWhiteSpace(unitText)
-                || string.IsNullOrWhiteSpace(unitPriceText)
-                || string.IsNullOrWhiteSpace(dateText))
+            if (!TryParsePositiveDouble(quantityText, out double quantity)
+                || !TryParsePositiveDecimal(unitPriceText, out decimal unitPrice)
+                || (!DateTime.TryParse(dateText, CultureInfo.CurrentCulture, DateTimeStyles.None, out DateTime inputDate)
+                    && !DateTime.TryParse(dateText, CultureInfo.InvariantCulture, DateTimeStyles.None, out inputDate)))
             {
-                errorMessage = "Vui lòng nhập đầy đủ thông tin bắt buộc.";
-                return false;
-            }
-
-            if (!TryParsePositiveDouble(quantityText, out double quantity))
-            {
-                errorMessage = "Số lượng phải là số lớn hơn 0.";
-                return false;
-            }
-
-            if (!TryParsePositiveDecimal(unitPriceText, out decimal unitPrice))
-            {
-                errorMessage = "Đơn giá phải là số lớn hơn 0.";
-                return false;
-            }
-
-            if (!DateTime.TryParse(dateText, CultureInfo.CurrentCulture, DateTimeStyles.None, out DateTime inputDate)
-                && !DateTime.TryParse(dateText, CultureInfo.InvariantCulture, DateTimeStyles.None, out inputDate))
-            {
-                errorMessage = "Ngày nhập không hợp lệ.";
-                return false;
-            }
-
-            if (!string.IsNullOrWhiteSpace(supplierContactText) && !isNumber(supplierContactText))
-            {
-                errorMessage = "Liên lạc chỉ được chứa chữ số.";
                 return false;
             }
 
@@ -391,6 +582,16 @@ namespace QuanLyNhaHang.ViewModel
             input.SupplierContact = supplierContactText;
 
             return true;
+        }
+
+        private void RestoreSelectedByName(string? productName)
+        {
+            if (string.IsNullOrWhiteSpace(productName))
+            {
+                return;
+            }
+
+            Selected = ListWareHouse.FirstOrDefault(x => string.Equals(x.TenSanPham, productName, StringComparison.OrdinalIgnoreCase));
         }
 
         private bool TryParsePositiveDouble(string text, out double value)
@@ -460,6 +661,7 @@ namespace QuanLyNhaHang.ViewModel
                 {
                     ShowMessage("Xóa thành công!");
                     SetFormMode(StockFormMode.StockIn);
+                    Selected = null;
                     ResetStockForm(false, true);
                 }
                 else
@@ -498,7 +700,7 @@ namespace QuanLyNhaHang.ViewModel
 
                 if (ten.Count == 0)
                 {
-                    ShowMessage("Chưa có sản phẩm nào \n      cần nhập thêm!");
+                    ShowMessage("Chưa có sản phẩm nào cần nhập thêm!");
                     return;
                 }
 

@@ -106,115 +106,147 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
-                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <StackPanel Grid.Row="0" Margin="0 0 0 20">
-                    <StackPanel Orientation="Horizontal" Margin="0 0 0 15">
+                <StackPanel Grid.Row="0" Margin="0 0 0 12">
+                    <StackPanel Orientation="Horizontal" Margin="0 0 0 6">
                         <fa:IconImage Icon="BoxOpen" Width="22" Height="22" Foreground="#1C3879" Margin="0 0 10 0"/>
                         <TextBlock Text="THÔNG TIN NHẬP KHO" FontSize="18" FontWeight="Bold" Foreground="#1E293B" VerticalAlignment="Center"/>
                     </StackPanel>
-
-                    <TextBlock Text="{Binding CurrentStockFormModeKey}" FontSize="12" FontWeight="Bold" Foreground="#1C3879"/>
-                    <TextBlock Text="{Binding CurrentStockFormModeDescription}" FontSize="12" Foreground="#64748B" Margin="0 4 0 10"/>
-
-                    <ComboBox materialDesign:HintAssist.Hint="Phiếu nhập gần đây (chọn để sửa)"
-                              ItemsSource="{Binding ListIn}" SelectedItem="{Binding SelectedInputHistory, Mode=TwoWay}"
-                              IsEnabled="{Binding CanSelectHistory}"
-                              DisplayMemberPath="HistoryDisplay"
-                              Style="{StaticResource MaterialDesignFloatingHintComboBox}" FontSize="15" Height="45"/>
+                    <TextBlock Text="Chọn đúng tab nghiệp vụ để giảm thao tác và tránh nhập sai." FontSize="12" Foreground="#64748B"/>
                 </StackPanel>
 
-                <Separator Grid.Row="0" VerticalAlignment="Bottom" Background="#E2E8F0" Margin="0"/>
+                <TabControl Grid.Row="1" SelectedIndex="{Binding CurrentStockTabIndex, Mode=TwoWay}">
+                    <TabItem Header="Nguyên liệu mới">
+                        <Grid Margin="8" FocusManager.FocusedElement="{Binding ElementName=NewIngredientIdBox}">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
+                                <StackPanel>
+                                    <TextBox x:Name="NewIngredientIdBox" materialDesign:HintAssist.Hint="Mã nhập" Text="{Binding ID, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource MaterialDesignFloatingHintTextBox}" Margin="0 8 0 0"/>
 
-                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="0 15 0 0">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="1*"/>
-                            <ColumnDefinition Width="10"/>
-                            <ColumnDefinition Width="1.5*"/>
-                        </Grid.ColumnDefinitions>
+                                    <TextBox materialDesign:HintAssist.Hint="Tên sản phẩm mới" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource MaterialDesignFloatingHintTextBox}" Margin="0 8 0 0"/>
 
-                        <TextBox Grid.Row="0" Grid.Column="0" materialDesign:HintAssist.Hint="Mã nhập" Margin="0 10 0 15"
-                                 Text="{Binding ID, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource MaterialDesignFloatingHintTextBox}" Height="45"/>
-                        <TextBox Grid.Row="0" Grid.Column="2" materialDesign:HintAssist.Hint="Tên sản phẩm" Margin="0 10 0 15"
-                                 Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource MaterialDesignFloatingHintTextBox}" Height="45"/>
+                                    <TextBox materialDesign:HintAssist.Hint="Số lượng" Text="{Binding Count, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource MaterialDesignFloatingHintTextBox}" Margin="0 8 0 0"/>
 
-                        <TextBox Grid.Row="1" Grid.Column="0" materialDesign:HintAssist.Hint="Số lượng" Margin="0 10 0 15"
-                                 Text="{Binding Count, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource MaterialDesignFloatingHintTextBox}" Height="45"/>
-                        <DatePicker Grid.Row="1" Grid.Column="2" materialDesign:HintAssist.Hint="Ngày nhập" Margin="0 10 0 15"
-                                    SelectedDate="{Binding DateIn, Mode=TwoWay, ValidatesOnDataErrors=False, UpdateSourceTrigger=PropertyChanged}"
-                                    Style="{StaticResource MaterialDesignFloatingHintDatePicker}" Height="45"/>
+                                    <TextBox materialDesign:HintAssist.Hint="Giá nhập" Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource MaterialDesignFloatingHintTextBox}" Margin="0 8 0 0"/>
 
-                        <TextBox Grid.Row="2" Grid.Column="0" materialDesign:HintAssist.Hint="Giá nhập" Margin="0 10 0 15"
-                                 Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource MaterialDesignFloatingHintTextBox}" Height="45"/>
-                        <ComboBox Grid.Row="2" Grid.Column="2" materialDesign:HintAssist.Hint="Đơn vị" Margin="0 10 0 15"
-                                  SelectedValue="{Binding Unit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" SelectedValuePath="Content"
-                                  Style="{StaticResource MaterialDesignFloatingHintComboBox}" Height="45">
-                            <ComboBoxItem>Kg</ComboBoxItem>
-                            <ComboBoxItem>Chai</ComboBoxItem>
-                            <ComboBoxItem>Quả</ComboBoxItem>
-                            <ComboBoxItem>Gói</ComboBoxItem>
-                            <ComboBoxItem>Con</ComboBoxItem>
-                            <ComboBoxItem>Lát</ComboBoxItem>
-                            <ComboBoxItem>Cây</ComboBoxItem>
-                            <ComboBoxItem>Lon</ComboBoxItem>
-                            <ComboBoxItem>Bó</ComboBoxItem>
-                        </ComboBox>
+                                    <ComboBox materialDesign:HintAssist.Hint="Đơn vị" SelectedValue="{Binding Unit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" SelectedValuePath="Content" Style="{StaticResource MaterialDesignFloatingHintComboBox}" Margin="0 8 0 0">
+                                        <ComboBoxItem>Kg</ComboBoxItem>
+                                        <ComboBoxItem>Chai</ComboBoxItem>
+                                        <ComboBoxItem>Quả</ComboBoxItem>
+                                        <ComboBoxItem>Gói</ComboBoxItem>
+                                        <ComboBoxItem>Con</ComboBoxItem>
+                                        <ComboBoxItem>Lát</ComboBoxItem>
+                                        <ComboBoxItem>Cây</ComboBoxItem>
+                                        <ComboBoxItem>Lon</ComboBoxItem>
+                                        <ComboBoxItem>Bó</ComboBoxItem>
+                                    </ComboBox>
 
-                        <TextBox Grid.Row="3" Grid.Column="0" materialDesign:HintAssist.Hint="Nguồn nhập" Margin="0 10 0 15"
-                                 Text="{Binding Suplier, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource MaterialDesignFloatingHintTextBox}" Height="45"/>
-                        <TextBox Grid.Row="3" Grid.Column="2" materialDesign:HintAssist.Hint="Liên lạc" Margin="0 10 0 15"
-                                 Text="{Binding SuplierInfo, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource MaterialDesignFloatingHintTextBox}" Height="45"/>
-                    </Grid>
-                </ScrollViewer>
+                                    <DatePicker materialDesign:HintAssist.Hint="Ngày nhập" SelectedDate="{Binding DateIn, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource MaterialDesignFloatingHintDatePicker}" Margin="0 8 0 0"/>
 
-                <Grid Grid.Row="2" Margin="0 10 0 0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="10"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="10"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
+                                    <TextBox materialDesign:HintAssist.Hint="Nguồn nhập" Text="{Binding Suplier, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource MaterialDesignFloatingHintTextBox}" Margin="0 8 0 0"/>
+                                    <TextBox materialDesign:HintAssist.Hint="Liên lạc" Text="{Binding SuplierInfo, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource MaterialDesignFloatingHintTextBox}" Margin="0 8 0 0"/>
+                                </StackPanel>
+                            </ScrollViewer>
+                            <Button Grid.Row="1" Command="{Binding AddCM}" Margin="0 12 0 0" Height="46" Background="#0EA5E9" Foreground="White" BorderThickness="0" materialDesign:ButtonAssist.CornerRadius="8">
+                                <TextBlock Text="LƯU NGUYÊN LIỆU MỚI" FontWeight="Bold"/>
+                            </Button>
+                        </Grid>
+                    </TabItem>
 
-                    <Button Grid.Column="0" Name="btnCreateIngredientMode" Command="{Binding CreateNewIngredientCM}"
-                            ToolTip="Tạo và khai báo một nguyên liệu hoàn toàn mới trong hệ thống"
-                            Background="#0EA5E9" Foreground="White" BorderThickness="0" Cursor="Hand" Height="50"
-                            materialDesign:ButtonAssist.CornerRadius="8">
-                        <StackPanel Orientation="Horizontal">
-                            <fa:IconImage Icon="BoxOpen" Width="18" Height="18" Foreground="White" Margin="0 0 10 0"/>
-                            <TextBlock Text="THÊM NGUYÊN LIỆU MỚI" FontSize="13" FontWeight="Bold" VerticalAlignment="Center"/>
-                        </StackPanel>
-                    </Button>
+                    <TabItem Header="Nhập bổ sung">
+                        <Grid Margin="8" FocusManager.FocusedElement="{Binding ElementName=StockInIdBox}">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
+                                <StackPanel>
+                                    <TextBox x:Name="StockInIdBox" materialDesign:HintAssist.Hint="Mã nhập" Text="{Binding ID, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource MaterialDesignFloatingHintTextBox}" Margin="0 8 0 0"/>
 
-                    <Button Grid.Column="2" Name="btnAddStockIn" Command="{Binding AddCM}"
-                            ToolTip="Lưu các thông tin trên và tạo một phiếu nhập hàng mới"
-                            Background="#1C3879" Foreground="White" BorderThickness="0" Cursor="Hand" Height="50"
-                            materialDesign:ButtonAssist.CornerRadius="8">
-                        <StackPanel Orientation="Horizontal">
-                            <fa:IconImage Icon="Plus" Width="18" Height="18" Foreground="White" Margin="0 0 10 0"/>
-                            <TextBlock Text="THÊM PHIẾU NHẬP" FontSize="13" FontWeight="Bold" VerticalAlignment="Center"/>
-                        </StackPanel>
-                    </Button>
+                                    <TextBox materialDesign:HintAssist.Hint="Tên sản phẩm" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="True" Style="{StaticResource MaterialDesignFloatingHintTextBox}" Margin="0 8 0 0"/>
 
-                    <Button Grid.Column="4" Name="btnEditStockIn" Command="{Binding EditCM}"
-                            ToolTip="Cập nhật những thay đổi vừa chỉnh sửa cho phiếu nhập đang chọn"
-                            Background="#10B981" Foreground="White" BorderThickness="0" Cursor="Hand" Height="50"
-                            materialDesign:ButtonAssist.CornerRadius="8">
-                        <StackPanel Orientation="Horizontal">
-                            <fa:IconImage Icon="Edit" Width="18" Height="18" Foreground="White" Margin="0 0 10 0"/>
-                            <TextBlock Text="SỬA PHIẾU ĐÃ CHỌN" FontSize="13" FontWeight="Bold" VerticalAlignment="Center"/>
-                        </StackPanel>
-                    </Button>
-                </Grid>
+                                    <TextBox materialDesign:HintAssist.Hint="Số lượng" Text="{Binding Count, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource MaterialDesignFloatingHintTextBox}" Margin="0 8 0 0"/>
 
+                                    <TextBox materialDesign:HintAssist.Hint="Giá nhập" Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource MaterialDesignFloatingHintTextBox}" Margin="0 8 0 0"/>
+
+                                    <ComboBox materialDesign:HintAssist.Hint="Đơn vị" SelectedValue="{Binding Unit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" SelectedValuePath="Content" Style="{StaticResource MaterialDesignFloatingHintComboBox}" Margin="0 8 0 0">
+                                        <ComboBoxItem>Kg</ComboBoxItem>
+                                        <ComboBoxItem>Chai</ComboBoxItem>
+                                        <ComboBoxItem>Quả</ComboBoxItem>
+                                        <ComboBoxItem>Gói</ComboBoxItem>
+                                        <ComboBoxItem>Con</ComboBoxItem>
+                                        <ComboBoxItem>Lát</ComboBoxItem>
+                                        <ComboBoxItem>Cây</ComboBoxItem>
+                                        <ComboBoxItem>Lon</ComboBoxItem>
+                                        <ComboBoxItem>Bó</ComboBoxItem>
+                                    </ComboBox>
+
+                                    <DatePicker materialDesign:HintAssist.Hint="Ngày nhập" SelectedDate="{Binding DateIn, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource MaterialDesignFloatingHintDatePicker}" Margin="0 8 0 0"/>
+
+                                    <TextBox materialDesign:HintAssist.Hint="Nguồn nhập" Text="{Binding Suplier, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource MaterialDesignFloatingHintTextBox}" Margin="0 8 0 0"/>
+                                    <TextBox materialDesign:HintAssist.Hint="Liên lạc" Text="{Binding SuplierInfo, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource MaterialDesignFloatingHintTextBox}" Margin="0 8 0 0"/>
+                                </StackPanel>
+                            </ScrollViewer>
+                            <Button Grid.Row="1" Command="{Binding AddCM}" Margin="0 12 0 0" Height="46" Background="#1C3879" Foreground="White" BorderThickness="0" materialDesign:ButtonAssist.CornerRadius="8">
+                                <TextBlock Text="THÊM PHIẾU NHẬP" FontWeight="Bold"/>
+                            </Button>
+                        </Grid>
+                    </TabItem>
+
+                    <TabItem Header="Sửa phiếu">
+                        <Grid Margin="8" FocusManager.FocusedElement="{Binding ElementName=EditHistoryCombo}">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <StackPanel Grid.Row="0" Margin="0 0 0 8">
+                                <ComboBox x:Name="EditHistoryCombo" materialDesign:HintAssist.Hint="Phiếu nhập gần đây (chọn để sửa)"
+                                          ItemsSource="{Binding ListIn}" SelectedItem="{Binding SelectedInputHistory, Mode=TwoWay}"
+                                          IsEnabled="{Binding CanSelectHistory}" DisplayMemberPath="HistoryDisplay"
+                                          Style="{StaticResource MaterialDesignFloatingHintComboBox}" Height="45"/>
+                            </StackPanel>
+
+                            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                                <StackPanel>
+                                    <TextBox materialDesign:HintAssist.Hint="Mã nhập" Text="{Binding ID, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="True" Style="{StaticResource MaterialDesignFloatingHintTextBox}" Margin="0 8 0 0"/>
+
+                                    <TextBox materialDesign:HintAssist.Hint="Tên sản phẩm" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="True" Style="{StaticResource MaterialDesignFloatingHintTextBox}" Margin="0 8 0 0"/>
+
+                                    <TextBox materialDesign:HintAssist.Hint="Số lượng" Text="{Binding Count, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource MaterialDesignFloatingHintTextBox}" Margin="0 8 0 0"/>
+
+                                    <TextBox materialDesign:HintAssist.Hint="Giá nhập" Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource MaterialDesignFloatingHintTextBox}" Margin="0 8 0 0"/>
+
+                                    <ComboBox materialDesign:HintAssist.Hint="Đơn vị" SelectedValue="{Binding Unit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" SelectedValuePath="Content" Style="{StaticResource MaterialDesignFloatingHintComboBox}" Margin="0 8 0 0">
+                                        <ComboBoxItem>Kg</ComboBoxItem>
+                                        <ComboBoxItem>Chai</ComboBoxItem>
+                                        <ComboBoxItem>Quả</ComboBoxItem>
+                                        <ComboBoxItem>Gói</ComboBoxItem>
+                                        <ComboBoxItem>Con</ComboBoxItem>
+                                        <ComboBoxItem>Lát</ComboBoxItem>
+                                        <ComboBoxItem>Cây</ComboBoxItem>
+                                        <ComboBoxItem>Lon</ComboBoxItem>
+                                        <ComboBoxItem>Bó</ComboBoxItem>
+                                    </ComboBox>
+
+                                    <DatePicker materialDesign:HintAssist.Hint="Ngày nhập" SelectedDate="{Binding DateIn, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource MaterialDesignFloatingHintDatePicker}" Margin="0 8 0 0"/>
+
+                                    <TextBox materialDesign:HintAssist.Hint="Nguồn nhập" Text="{Binding Suplier, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource MaterialDesignFloatingHintTextBox}" Margin="0 8 0 0"/>
+                                    <TextBox materialDesign:HintAssist.Hint="Liên lạc" Text="{Binding SuplierInfo, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource MaterialDesignFloatingHintTextBox}" Margin="0 8 0 0"/>
+                                </StackPanel>
+                            </ScrollViewer>
+
+                            <Button Grid.Row="2" Command="{Binding EditCM}" Margin="0 12 0 0" Height="46" Background="#10B981" Foreground="White" BorderThickness="0" materialDesign:ButtonAssist.CornerRadius="8">
+                                <TextBlock Text="LƯU SỬA PHIẾU" FontWeight="Bold"/>
+                            </Button>
+                        </Grid>
+                    </TabItem>
+                </TabControl>
             </Grid>
         </Border>
     </Grid>
