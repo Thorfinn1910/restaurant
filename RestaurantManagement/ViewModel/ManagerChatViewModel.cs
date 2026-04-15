@@ -9,14 +9,19 @@ namespace QuanLyNhaHang.ViewModel
 {
     public sealed class ManagerChatViewModel : BaseViewModel
     {
-        private readonly ManagerChatMockService _chatMockService;
+        private readonly IManagerChatService _chatService;
         private ObservableCollection<ChatMessage> _messages;
         private string _currentQuestion = string.Empty;
         private bool _isProcessing;
 
         public ManagerChatViewModel()
+            : this(new ManagerChatApiService())
         {
-            _chatMockService = new ManagerChatMockService();
+        }
+
+        internal ManagerChatViewModel(IManagerChatService chatService)
+        {
+            _chatService = chatService ?? throw new ArgumentNullException(nameof(chatService));
             _messages = new ObservableCollection<ChatMessage>();
 
             SendMessageCommand = new RelayCommand<object>((p) => CanSendMessage(), async (p) => await SendMessageAsync());
@@ -75,13 +80,29 @@ namespace QuanLyNhaHang.ViewModel
             CurrentQuestion = string.Empty;
 
             Messages.Add(new ChatMessage(question, true, DateTime.Now, "user"));
+            CommandManager.InvalidateRequerySuggested();
             IsProcessing = true;
 
             try
             {
-                await Task.Delay(300);
-                ManagerChatMockResult result = _chatMockService.GetReply(question);
-                Messages.Add(new ChatMessage(result.ReplyText, false, DateTime.Now, result.IntentTag));
+                ManagerChatServiceResult result = await _chatService.GetReplyAsync(question);
+                string intentTag = result.IsSuccess ? "assistant" : "error";
+                if (!string.IsNullOrWhiteSpace(result.ErrorCode))
+                {
+                    intentTag = result.IsSuccess ? "assistant" : result.ErrorCode;
+                }
+
+                Messages.Add(new ChatMessage(result.ReplyText, false, DateTime.Now, intentTag));
+                CommandManager.InvalidateRequerySuggested();
+            }
+            catch (Exception)
+            {
+                Messages.Add(new ChatMessage(
+                    "Da xay ra loi trong qua trinh xu ly cau hoi. Vui long thu lai.",
+                    false,
+                    DateTime.Now,
+                    "error"));
+                CommandManager.InvalidateRequerySuggested();
             }
             finally
             {
@@ -92,6 +113,7 @@ namespace QuanLyNhaHang.ViewModel
         private void ClearChat()
         {
             Messages.Clear();
+            CommandManager.InvalidateRequerySuggested();
         }
     }
 }
